@@ -753,6 +753,51 @@ await test('a double-click arms the picker and the page click picks the start an
   harness.dispose()
 })
 
+await test('one bubble at a time: the pick bubble replaces the hover bubble', async () => {
+  // Regression: hovering shows the idle bubble, and a double-click arms the
+  // picker while the pointer is still on the icon — so both bubbles used to be
+  // positioned above it and the pick wording was covered by the idle one.
+  const harness = createHarness({ tts: false })
+  const { instance, document, internals } = harness
+  const button = () => document.querySelector('#mount-right button')
+  const tip = () => document.querySelector('.sh-vk-tip')
+  const hint = () => document.querySelector('.sh-vk-hint')
+
+  // The pointer arrives on the icon: the idle bubble shows.
+  harness.runtime.dispatch(instance, button(), 'pointerenter', {})
+  equal(tip().style.display, 'block', 'the idle bubble shows on hover')
+  equal(hint(), null, 'and no pick bubble exists yet')
+
+  // The double-click happens without the pointer ever leaving the icon.
+  doubleClick(harness)
+  equal(internals.state.picking, true, 'picker armed')
+  equal(tip().style.display, 'none', 'the idle bubble is taken down')
+  equal(hint().style.display, 'block', 'the pick bubble is the one on screen')
+  equal(hint().textContent.slice(0, 9), '选择开始位置后点击', 'and it carries the pick wording')
+  assert(hint().style.top && hint().style.left, 'the pick bubble was placed (jsdom has no paint, so only placement is checkable)')
+
+  // A re-fired pointerenter must not bring the idle bubble back while picking.
+  harness.runtime.dispatch(instance, button(), 'pointerenter', {})
+  equal(tip().style.display, 'none', 'hovering again does not resurrect it')
+  harness.flushTimers() // the deferred take-down must not undo anything either
+  equal(tip().style.display, 'none', 'still hidden after the next paint')
+  equal(hint().style.display, 'block', 'and the pick bubble stays up')
+
+  // Choosing the start position retires the pick bubble; hovering works again.
+  const reply = document.getElementById('reply')
+  const replyBox = reply.getBoundingClientRect()
+  harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: replyBox.left + 30, clientY: replyBox.top + 8, pointerId: 5, button: 0 })
+  harness.runtime.dispatch(instance, document, 'pointerup', { clientX: replyBox.left + 30, clientY: replyBox.top + 8, pointerId: 5 })
+  await harness.settle()
+  equal(internals.state.picking, false, 'the pick is committed')
+  equal(hint().style.display, 'none', 'the pick bubble is gone')
+  harness.runtime.dispatch(instance, button(), 'pointerenter', {})
+  equal(tip().style.display, 'block', 'the idle bubble is available again')
+  harness.runtime.dispatch(instance, button(), 'pointerleave', {})
+  equal(tip().style.display, 'none', 'and it still hides on leave')
+  harness.dispose()
+})
+
 await test('the DOM map and the flattened text share one coordinate space', async () => {
   // Regression: walkText opens every block with a newline, and tidy() used to
   // trim that newline off the *string* while leaving the map's offsets alone.

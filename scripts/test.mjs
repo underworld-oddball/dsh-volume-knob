@@ -369,10 +369,30 @@ function createHarness (options = {}) {
   assert(window.__slotComponent, 'slot was not registered')
   const instance = runtime.mount(window.__slotComponent, window.document.getElementById('mount-right'))
 
-  const flushTimers = () => {
-    const entries = [...pendingTimers.entries()]
-    pendingTimers.clear()
-    for (const [, entry] of entries) entry.fn()
+  /** Fire one queued timer by id (the map's key), returning whether it existed. */
+  const runTimer = (id) => {
+    const entry = pendingTimers.get(id)
+    if (!entry) return false
+    pendingTimers.delete(id)
+    entry.fn()
+    return true
+  }
+
+  /**
+   * Run the queued window timers, optionally only those due within `maxMs`
+   * (default: all of them). A long-lived timer — the picker's idle auto-cancel
+   * — must not be fired by tests that are waiting out a short timer, or it
+   * cancels sessions those tests are still using.
+   */
+  const flushTimers = (maxMs = Infinity) => {
+    const due = []
+    for (const [id, entry] of [...pendingTimers.entries()]) {
+      if (entry.ms > maxMs) continue
+      pendingTimers.delete(id)
+      due.push(entry)
+    }
+    for (const entry of due) entry.fn()
+    return due.length
   }
 
   const settle = async () => { await new Promise((resolve) => realSetTimeout(resolve, 0)) }
@@ -391,6 +411,7 @@ function createHarness (options = {}) {
   return {
     dom, window, document: window.document, layout, requests, spoken, audioQueue,
     pausedElements, internals, runtime, instance, flushTimers, settle, sleep, autoPlay, endAudio,
+    pendingTimers, runTimer,
     speechCancels: () => speechCancelCount,
     dispose: () => { for (const fn of applied) { try { fn() } catch { /* ignore */ } } },
   }
@@ -594,7 +615,7 @@ const longPress = async (harness) => {
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
   await harness.sleep(450) // the hold threshold is wall-clock, like the real one
-  harness.flushTimers() // the harness queues window timers; fire the hold one
+  harness.flushTimers(1000) // fire the 400ms hold timer, not the 5s idle one
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
 }
 
@@ -728,7 +749,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   // Hold past the threshold, then release: the release is what changes the
   // bubble and arms the picker, and it must not turn into a read.
   await harness.sleep(450)
-  harness.flushTimers()
+  harness.flushTimers(1000)
   equal(internals.state.picking, false, 'the hold alone still does not arm the picker')
   harness.runtime.dispatch(instance, button(), 'pointerup', { clientX: 100, clientY: 700, pointerId: 1 })
   equal(internals.state.picking, true, 'the release after a hold arms the picker')
@@ -736,7 +757,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   equal(internals.state.reading, false, 'the release after a hold does not read')
   equal(document.querySelector('.sh-vk-tip').style.display, 'none', 'and the hover bubble steps aside')
   equal(hint().style.display, 'block', 'the pick bubble takes its place')
-  harness.flushTimers() // the deferred take-down must keep the pick bubble
+  harness.flushTimers(1000) // only the sub-second timers; the 5s idle one must stay pending
   includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
   equal(caret().style.display, 'none', 'no caret while the page click is awaited')
@@ -799,7 +820,7 @@ await test('the pick bubble replaces the hover bubble and is retired by the firs
   // A re-fired pointerenter must not bring the idle bubble back while picking.
   harness.runtime.dispatch(instance, button(), 'pointerenter', {})
   equal(tip().style.display, 'none', 'hovering again does not resurrect it')
-  harness.flushTimers() // the deferred take-down must not undo anything either
+  harness.flushTimers(1000) // the deferred take-down only; the 5s idle timer stays pending
   equal(tip().style.display, 'none', 'still hidden after the next paint')
   equal(hint().style.display, 'block', 'and the pick bubble is still up')
 
@@ -843,7 +864,7 @@ await test('moving the mouse only retires the bubble: the pick stays armed', asy
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
   await harness.sleep(450)
-  harness.flushTimers()
+  harness.flushTimers(1000)
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
   equal(internals.state.picking, true, 'the hold armed the picker')
   equal(hint().style.display, 'block', 'the pick bubble is up')
@@ -876,7 +897,7 @@ await test('a key press during the pick cancels it and retires the bubble', asyn
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
   await harness.sleep(450)
-  harness.flushTimers()
+  harness.flushTimers(1000)
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
   equal(internals.state.picking, true, 'the hold armed the picker')
   equal(hint().style.display, 'block', 'the pick bubble is up')
@@ -913,7 +934,7 @@ await test('a wheel turn, a drag, a context click or a blur all cancel the pick'
     harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
     harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
     await harness.sleep(450)
-    harness.flushTimers()
+    harness.flushTimers(1000)
     harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
     equal(internals.state.picking, true, `${label}: armed`)
     harness.runtime.dispatch(instance, target === 'window' ? window : document, type, event)
@@ -922,6 +943,83 @@ await test('a wheel turn, a drag, a context click or a blur all cancel the pick'
     equal(internals.state.reading, false, `${label}: nothing is read`)
     harness.dispose()
   }
+})
+
+await test('the pick times out even when the mouse never moves after the release', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const caret = () => document.querySelector('.sh-vk-caret')
+  const hint = () => document.querySelector('.sh-vk-hint')
+
+  await longPress(harness)
+  equal(internals.state.picking, true, 'the hold armed the picker')
+  equal(hint().style.display, 'block', 'the bubble is up (the mouse has not moved)')
+  equal(document.body.style.cursor, 'crosshair', 'and the pointer is the pick cursor')
+  // The countdown is live from the moment the picker arms, even with no move:
+  // its timer is the 5s entry in the harness' timer table.
+  const idle = [...harness.pendingTimers.entries()].find(([, entry]) => entry.ms === 5000)
+  assert(idle, 'the idle auto-cancel timer is pending')
+  assert(harness.runTimer(idle[0]), 'and it fires')
+  equal(internals.state.picking, false, 'the idle pick cancels itself')
+  equal(hint().style.display, 'none', 'the bubble is gone')
+  equal(caret().style.display, 'none', 'no caret is left blinking')
+  equal(document.body.style.cursor, '', '光标回到初始状态')
+  equal(internals.state.reading, false, 'and nothing was read')
+  harness.dispose()
+})
+
+await test('a pick that is left idle after the move times out and cancels itself', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const caret = () => document.querySelector('.sh-vk-caret')
+  const hint = () => document.querySelector('.sh-vk-hint')
+
+  // A caret is on screen when the pick starts, so "光标回到初始状态" is visible.
+  internals.state.cursor = { key: 'a2resp', offset: 3 }
+  const stream = internals.messageIndex()
+  internals.focusStartPosition({ stream, offset: stream.text.indexOf(ASSISTANT_TEXT) + 3 })
+  equal(caret().style.display, 'block', 'the caret is blinking before the pick')
+
+  await longPress(harness)
+  equal(internals.state.picking, true, 'the hold armed the picker')
+  // Moving retires the bubble and starts the idle countdown.
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
+  equal(hint().style.display, 'none', 'the move retires the bubble')
+  equal(internals.state.picking, true, 'and the pick waits for a click')
+
+  // Still armed while real time passes well inside the window.
+  await harness.sleep(2000)
+  equal(internals.state.picking, true, 'still waiting inside the idle window')
+  // Nobody touches anything: the pending idle timer is what ends the session.
+  const idle = [...harness.pendingTimers.entries()].find(([, entry]) => entry.ms === 5000)
+  assert(idle, 'the idle auto-cancel timer is pending')
+  assert(harness.runTimer(idle[0]), 'and it fires')
+  equal(internals.state.picking, false, 'the idle pick cancels itself')
+  equal(internals.state.pickStage, 'idle', 'back to idle')
+  equal(caret().style.display, 'none', 'the caret stops blinking')
+  equal(document.body.style.cursor, '', 'the pointer is back to normal')
+  harness.dispose()
+})
+
+await test('every mouse move resets the idle countdown', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+
+  await longPress(harness)
+  for (let i = 0; i < 3; i += 1) {
+    harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320 + i, clientY: 480 })
+    await harness.sleep(1200) // real time passes, well inside one window
+    equal(internals.state.picking, true, `still armed after move ${i + 1}`)
+    // Every move replaces the pending timer: exactly one idle timer remains.
+    const pending = [...harness.pendingTimers.entries()].filter(([, entry]) => entry.ms === 5000)
+    equal(pending.length, 1, `move ${i + 1} left exactly one idle timer pending`)
+  }
+  // Stop moving: the last move's countdown is the one that ends the pick.
+  const idle = [...harness.pendingTimers.entries()].find(([, entry]) => entry.ms === 5000)
+  assert(idle, 'the last move scheduled the idle timer')
+  assert(harness.runTimer(idle[0]), 'and it fires')
+  equal(internals.state.picking, false, 'after the last move the idle wait finally cancels it')
+  harness.dispose()
 })
 
 await test('the DOM map and the flattened text share one coordinate space', async () => {

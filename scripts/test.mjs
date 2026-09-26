@@ -681,19 +681,28 @@ await test('click reads from the start of the newest question and scrolls there'
   harness.dispose()
 })
 
-await test('clicking again stops playback', async () => {
+await test('a press hides the hover bubble, the release reads, the next click stops', async () => {
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
+  const tip = () => document.querySelector('.sh-vk-tip')
   const click = () => {
     harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
     harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
   }
-  click()
+
+  // Hovering shows the bubble; the press takes it down before anything reads.
+  harness.runtime.dispatch(instance, button, 'pointerenter', {})
+  equal(tip().style.display, 'block', 'the hover bubble is up while hovering')
+  harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
+  equal(tip().style.display, 'none', 'pressing the icon hides the hover bubble')
+  equal(internals.state.reading, false, 'and the press alone does not read yet')
+  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
   await harness.settle()
   await harness.settle()
-  equal(internals.state.reading, true, 'reading while the clip plays')
-  equal(document.querySelector('#mount-right button').getAttribute('aria-pressed'), 'true', 'the button reports playing')
+  equal(tip().style.display, 'none', 'and it stays down after the release')
+  equal(internals.state.reading, true, 'the release started the reading')
+  equal(button.getAttribute('aria-pressed'), 'true', 'the button reports playing')
   // A second click is a click, not a hold: it stops the reading.
   click()
   equal(internals.state.reading, false, 'stopped after the second click')

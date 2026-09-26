@@ -585,9 +585,8 @@ function createReactRuntime (window) {
 console.log('sh-volume-shuff — client bundle tests\n')
 
 /**
- * One press-and-hold on the icon, as a browser delivers it: press, move a
- * single pixel, wait out the hold threshold (the picker arms while the button
- * is still down), then release.
+ * One press-and-hold on the icon, as a browser delivers it: press, wait out the
+ * hold threshold, then release — the release is what arms the picker.
  */
 const longPress = async (harness) => {
   const { instance, document } = harness
@@ -712,19 +711,23 @@ await test('holding the icon arms the picker and the page click picks the start 
   const hint = () => document.querySelector('.sh-vk-hint') || { style: {}, textContent: '' }
   // A fresh press does not arm anything: the hold threshold has to pass first.
   harness.runtime.dispatch(instance, button(), 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
-  harness.runtime.dispatch(instance, button(), 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
+  harness.runtime.dispatch(instance, button(), 'pointerenter', {}) // the pointer is on the icon
   equal(internals.state.picking, false, 'a fresh press does not arm the picker')
-  equal(document.querySelector('.sh-vk-hint'), null, 'and no bubble is up yet')
-  // Hold past the threshold: the picker arms while the button is still down, so
-  // the release cannot turn into a read.
+  equal(document.querySelector('.sh-vk-hint'), null, 'and no pick bubble is up yet')
+  equal(document.querySelector('.sh-vk-tip').style.display, 'block', 'the hover bubble stays up while holding')
+  includes(document.querySelector('.sh-vk-tip').textContent, '按住选起点', 'and it still carries the idle wording')
+  // Hold past the threshold, then release: the release is what changes the
+  // bubble and arms the picker, and it must not turn into a read.
   await harness.sleep(450)
   harness.flushTimers()
-  equal(internals.state.picking, true, 'the hold armed the picker')
+  equal(internals.state.picking, false, 'the hold alone still does not arm the picker')
+  harness.runtime.dispatch(instance, button(), 'pointerup', { clientX: 100, clientY: 700, pointerId: 1 })
+  equal(internals.state.picking, true, 'the release after a hold arms the picker')
   equal(internals.state.pickStage, 'armed', 'stage = armed')
-  equal(document.querySelector('.sh-vk-hint').style.display, 'block', 'the pick bubble comes up during the hold')
-  harness.runtime.dispatch(instance, button(), 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
   equal(internals.state.reading, false, 'the release after a hold does not read')
-  equal(hint().style.display, 'block', 'the pick bubble is still up after the release')
+  equal(document.querySelector('.sh-vk-tip').style.display, 'none', 'and the hover bubble steps aside')
+  equal(hint().style.display, 'block', 'the pick bubble takes its place')
+  harness.flushTimers() // the deferred take-down must keep the pick bubble
   includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
   equal(caret().style.display, 'none', 'no caret while the page click is awaited')
@@ -853,7 +856,7 @@ await test('moving the mouse only retires the bubble: the pick stays armed', asy
   harness.dispose()
 })
 
-await test('a key press during the pick cancels it and restores the hover bubble', async () => {
+await test('a key press during the pick cancels it and retires the bubble', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -874,8 +877,7 @@ await test('a key press during the pick cancels it and restores the hover bubble
   equal(hint().style.display, 'none', 'and takes the pick bubble down')
   equal(document.body.style.cursor, '', 'and restores the pointer')
   equal(internals.state.reading, false, 'nothing is read')
-  equal(tip().style.display, 'block', 'the hover bubble returns (the icon is hovered)')
-  includes(tip().textContent, '按住选起点', 'with the idle wording')
+  equal(tip().style.display, 'none', 'the hover bubble does not come back with the pick gone')
 
   // With the picker gone the icon is a plain click target again.
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 3, button: 0 })

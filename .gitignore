@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+
+# never commit npm credentials or packed artifacts
+.npmrc
+*.tgz

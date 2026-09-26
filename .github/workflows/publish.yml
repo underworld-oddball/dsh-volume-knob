@@ -1,0 +1,47 @@
+name: Publish to npm
+
+# Trusted publishing (OIDC): no long-lived npm token, no OTP prompt.
+# Requires a trusted publisher for this repository on npmjs.com — see PUBLISH.md §6.
+#
+# Release flow:  bump version in package.json → commit → `git tag vX.Y.Z` → `git push --tags`
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC token — this is what npm trusted publishing consumes
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24' # trusted publishing needs Node >= 22.14.0 / npm >= 11.5.1
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false # never cache in release builds
+
+      - name: Show toolchain versions
+        run: node --version && npm --version
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          pkg="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          echo "package.json=$pkg tag=$tag"
+          if [ "$pkg" != "$tag" ]; then
+            echo "::error::tag '$tag' does not match package.json version '$pkg'"
+            exit 1
+          fi
+
+      # This package has no dependencies, so there is nothing to install or build.
+      - name: Publish
+        run: npm publish --provenance --access public

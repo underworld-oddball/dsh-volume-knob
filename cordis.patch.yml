@@ -1,0 +1,8 @@
+# sh-volume-shuff bundle layer.
+#
+# `name` must stay the full package name: the client-modules registry resolves
+# the browser bundle by the loader entry name.
+- insert:
+    - id: sh-volume-shuff
+      name: 'sh-volume-shuff'
+      config: {}

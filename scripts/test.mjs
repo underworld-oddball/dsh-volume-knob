@@ -722,11 +722,18 @@ await test('a double-click arms the picker and the page click picks the start an
   equal(internals.state.picking, true, 'the double-click armed the picker')
   equal(internals.state.pickStage, 'armed', 'stage = armed')
   equal(internals.state.reading, false, 'and the click it interrupted is not reading')
-  equal(hint().style.display, 'block', 'the pick bubble stays on screen')
+  equal(hint().style.display, 'block', 'the pick bubble shows right after the double-click')
   includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
   equal(caret().style.display, 'none', 'no caret while the page click is awaited')
   equal(document.body.style.cursor, 'crosshair', 'the page invites a click')
+
+  // Moving the pointer retires the bubble — the click that chooses the start
+  // position no longer has to dismiss it.
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
+  equal(hint().style.display, 'none', 'moving the mouse hides the pick bubble')
+  equal(internals.state.picking, true, 'the picker stays armed after the move')
+  equal(document.body.style.cursor, 'crosshair', 'and the page still invites the click')
 
   // Stage 2 — clicking readable text places the caret and reads from there.
   harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: box.left + 50, clientY: box.top + 8, pointerId: 3, button: 0 })
@@ -753,12 +760,12 @@ await test('a double-click arms the picker and the page click picks the start an
   harness.dispose()
 })
 
-await test('one bubble at a time: the pick bubble replaces the hover bubble', async () => {
+await test('the pick bubble replaces the hover bubble and is retired by the first pointer move', async () => {
   // Regression: hovering shows the idle bubble, and a double-click arms the
   // picker while the pointer is still on the icon — so both bubbles used to be
   // positioned above it and the pick wording was covered by the idle one.
   const harness = createHarness({ tts: false })
-  const { instance, document, internals } = harness
+  const { instance, document, window, internals } = harness
   const button = () => document.querySelector('#mount-right button')
   const tip = () => document.querySelector('.sh-vk-tip')
   const hint = () => document.querySelector('.sh-vk-hint')
@@ -781,7 +788,20 @@ await test('one bubble at a time: the pick bubble replaces the hover bubble', as
   equal(tip().style.display, 'none', 'hovering again does not resurrect it')
   harness.flushTimers() // the deferred take-down must not undo anything either
   equal(tip().style.display, 'none', 'still hidden after the next paint')
-  equal(hint().style.display, 'block', 'and the pick bubble stays up')
+  equal(hint().style.display, 'block', 'and the pick bubble is still up')
+
+  // The bubble lives until the pointer moves: a scroll or resize before that
+  // must keep it on screen (it follows the composer).
+  harness.runtime.dispatch(instance, window, 'scroll', {})
+  equal(hint().style.display, 'block', 'a scroll before the move keeps the bubble up')
+
+  // The first movement retires it for good — later scrolls must not revive it.
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
+  equal(hint().style.display, 'none', 'the first pointer movement hides the pick bubble')
+  harness.runtime.dispatch(instance, window, 'scroll', {})
+  harness.runtime.dispatch(instance, window, 'resize', {})
+  equal(hint().style.display, 'none', 'and no scroll or resize brings it back')
+  equal(internals.state.picking, true, 'the picker is still armed after moving')
 
   // Choosing the start position retires the pick bubble; hovering works again.
   const reply = document.getElementById('reply')

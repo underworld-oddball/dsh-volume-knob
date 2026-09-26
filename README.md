@@ -41,7 +41,7 @@ dsh plugin --profile web add github:underworld-oddball/sh-volume-shuff
 | 点击其他地方 / Esc | 收起混音台 / 取消挑选 |
 | 长按（≥400ms） | 不朗读，改为进入挑起点（防误触、也是挑起点手势） |
 | 混音台开着时单击图标 | 只收起混音台 |
-| 悬停图标 | 两行提示：`点击朗读；上滑调音量；按住选起点` + 灰色 `Tap: Speak / Swipe ↑: Volume / Down: Pick` |
+| 悬停图标 | 两行提示：`点击朗读；上滑调音量；按住选起点` + 灰色 `Tap: Speak / Swipe ↑: Volume / Hold: Pick` |
 | Enter / Space | 朗读 / 停止 |
 | Alt + ↑ | 开关混音台 |
 | ← / → | 光标左右移 1 字（挑选模式下同样可微调） |
@@ -71,7 +71,7 @@ dsh plugin --profile web add github:underworld-oddball/sh-volume-shuff
 
 | 场景 | 中文（上） | 英文（下，灰） |
 | --- | --- | --- |
-| 悬停图标（空闲） | `点击朗读；上滑调音量；按住选起点` | `Tap: Speak / Swipe ↑: Volume / Down: Pick` |
+| 悬停图标（空闲） | `点击朗读；上滑调音量；按住选起点` | `Tap: Speak / Swipe ↑: Volume / Hold: Pick` |
 | 悬停图标（朗读中） | `点击停止` | `Tap: Stop` |
 | 按住后（鼠标未动） | `选择开始位置后点击` | `After Pick → Tap` |
 

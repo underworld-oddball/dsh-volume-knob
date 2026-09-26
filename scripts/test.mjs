@@ -1011,12 +1011,12 @@ await test('the icon hover bubble shows both languages in the hint styling, not 
   assert(tip, 'the hover bubble exists')
   equal(tip.style.display, 'block', 'and is visible on hover')
   // Chinese on top, English under it, one line each.
-  equal(tip.textContent, '点击朗读；上滑调音量；按住选起点Tap: Speak / Swipe ↑: Volume / Down: Pick', 'both languages are in the bubble')
+  equal(tip.textContent, '点击朗读；上滑调音量；按住选起点Tap: Speak / Swipe ↑: Volume / Hold: Pick', 'both languages are in the bubble')
   const lines = tip.querySelectorAll('.sh-vk-line')
   equal(lines.length, 2, 'two lines: Chinese and English')
   equal(lines[0].textContent, '点击朗读；上滑调音量；按住选起点', 'the Chinese line comes first')
   includes(lines[1].className, 'sh-vk-hint-en', 'the English caption has its own class')
-  equal(lines[1].textContent, 'Tap: Speak / Swipe ↑: Volume / Down: Pick', 'the English caption wording')
+  equal(lines[1].textContent, 'Tap: Speak / Swipe ↑: Volume / Hold: Pick', 'the English caption wording')
   const css = document.getElementById('sh-vk-style').textContent
   includes(css, '.sh-vk-hint, .sh-vk-tip', 'the bubble shares the hint stylesheet')
   includes(css, 'color: #c2410c', 'and the hint colour')

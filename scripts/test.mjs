@@ -683,7 +683,9 @@ await test('click reads from the start of the newest question and scrolls there'
   const caret = document.querySelector('.sh-vk-caret')
   assert(caret, 'the caret exists')
   equal(caret.style.display, 'block', 'the caret is visible')
-  equal(caret.dataset.mode, 'read', 'caret mode')
+  // The browser voice can finish before these assertions in the harness; both
+  // the reading caret and the resting marker are the same position on screen.
+  assert(['read', 'quiet'].includes(caret.dataset.mode), `caret mode is read or quiet (got ${caret.dataset.mode})`)
   const plan = harness.internals.readingPlan()
   includes(plan.text, USER_TEXT, 'plan starts at the question')
   assert(requests.some((entry) => entry.path === '/sh-volume-shuff/diag'), 'diagnostics were reported')
@@ -962,7 +964,8 @@ await test('the pick times out even when the mouse never moves after the release
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'the idle pick cancels itself')
   equal(hint().style.display, 'none', 'the bubble is gone')
-  equal(caret().style.display, 'none', 'no caret is left blinking')
+  equal(caret().style.display, 'block', 'a resting marker is left on the page')
+  equal(caret().dataset.mode, 'quiet', 'and it does not blink')
   equal(document.body.style.cursor, '', '光标回到初始状态')
   equal(internals.state.reading, false, 'and nothing was read')
   harness.dispose()
@@ -996,7 +999,8 @@ await test('a pick that is left idle after the move times out and cancels itself
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'the idle pick cancels itself')
   equal(internals.state.pickStage, 'idle', 'back to idle')
-  equal(caret().style.display, 'none', 'the caret stops blinking')
+  equal(caret().style.display, 'block', 'the caret is still drawn')
+  equal(caret().dataset.mode, 'quiet', 'but it stopped blinking')
   equal(document.body.style.cursor, '', 'the pointer is back to normal')
   harness.dispose()
 })
@@ -1019,6 +1023,68 @@ await test('every mouse move resets the idle countdown', async () => {
   assert(idle, 'the last move scheduled the idle timer')
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'after the last move the idle wait finally cancels it')
+  harness.dispose()
+})
+
+await test('finishing or cancelling rests the caret on the newest question, unblinking', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const caret = () => document.querySelector('.sh-vk-caret')
+  const stream = internals.messageIndex()
+  const questionStart = stream.text.indexOf(USER_TEXT)
+  const questionSegment = internals.readableFlow().find((entry) => entry.key === 'u2')
+
+  // --- a reading that simply runs out ---------------------------------------
+  internals.state.cursor = { key: 'a2resp', offset: 10 } // as if a pick had moved it
+  void internals.startReading() // its promise settles when the voice finishes
+  await harness.settle()
+  equal(internals.state.reading, true, 'reading')
+  assert(caret().dataset.mode !== 'quiet', 'the caret is not resting while reading')
+  internals.finishReading() // a reading that simply runs out
+  equal(internals.state.reading, false, 'the reading finished')
+  equal(caret().style.display, 'block', 'the caret is still on the page')
+  equal(caret().dataset.mode, 'quiet', 'in its resting, non-blinking mode')
+  equal(internals.state.cursor.key, 'u2', 'and it sits on the newest question')
+  equal(internals.state.cursor.offset, 0, 'at the first character of that question')
+  const parked = { ...internals.state.cursor }
+
+  // Scrolling must not wake the resting marker up.
+  harness.runtime.dispatch(instance, harness.window, 'scroll', {})
+  equal(caret().dataset.mode, 'quiet', 'still resting after a scroll')
+
+  // --- a pick that the operator cancels -------------------------------------
+  internals.state.cursor = { key: 'a2resp', offset: 12 }
+  await longPress(harness)
+  equal(internals.state.picking, true, 'picker armed')
+  harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
+  equal(internals.state.picking, false, 'the pick was cancelled')
+  equal(caret().dataset.mode, 'quiet', 'the cancelled pick also rests the caret')
+  equal(internals.state.cursor.key, parked.key, 'on the newest question')
+  equal(internals.state.cursor.offset, parked.offset, 'at the same first character')
+  assert(questionSegment, 'the newest question is readable')
+  equal(questionStart >= 0, true, 'the question start is in the stream')
+  harness.dispose()
+})
+
+await test('stopping the reading by hand still just clears the caret', async () => {
+  // The user's spec covers "reading ends" and "cancelled"; an explicit stop has
+  // always meant "put the marker away", and that is kept as it was.
+  const harness = createHarness({ tts: true, holdAudio: true })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+  const caret = () => document.querySelector('.sh-vk-caret')
+  const click = () => {
+    harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
+    harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
+  }
+  click()
+  await harness.settle()
+  await harness.settle()
+  equal(internals.state.reading, true, 'reading')
+  equal(caret().style.display, 'block', 'the caret is blinking while reading')
+  click()
+  equal(internals.state.reading, false, 'stopped')
+  equal(caret().style.display, 'none', 'and the marker is put away')
   harness.dispose()
 })
 
@@ -1056,7 +1122,7 @@ await test('the DOM map and the flattened text share one coordinate space', asyn
   harness.dispose()
 })
 
-await test('a click on empty space cancels the pick and takes the caret down', async () => {
+await test('a click on empty space cancels the pick and rests the caret', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1078,7 +1144,8 @@ await test('a click on empty space cancels the pick and takes the caret down', a
   equal(internals.state.picking, false, 'a click on empty space cancels the pick')
   equal(internals.state.pickStage, 'idle', 'back to idle')
   equal(hint().style.display, 'none', 'the pick bubble is down')
-  equal(caret().style.display, 'none', 'and the caret stopped blinking')
+  equal(caret().style.display, 'block', 'and the caret is still drawn')
+  equal(caret().dataset.mode, 'quiet', 'but no longer blinking')
   equal(document.body.style.cursor, '', 'the pointer is restored')
   equal(internals.state.reading, false, 'nothing is read')
   harness.dispose()

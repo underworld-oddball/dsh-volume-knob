@@ -949,20 +949,31 @@ await test('the DOM map and the flattened text share one coordinate space', asyn
   harness.dispose()
 })
 
-await test('an armed picker ignores a click that misses readable text', async () => {
-  const harness = createHarness({ tts: false })
+await test('a click on empty space cancels the pick and takes the caret down', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
-  const reply = document.getElementById('reply')
-  const box = reply.getBoundingClientRect()
-  // The hold arms the picker; this miss must not place a caret or read.
+  const button = document.querySelector('#mount-right button')
+  const caret = () => document.querySelector('.sh-vk-caret')
+  const hint = () => document.querySelector('.sh-vk-hint')
+
+  // A reading is on, so a caret is blinking when the pick starts.
+  internals.state.cursor = { key: 'a2resp', offset: 3 }
+  const stream = internals.messageIndex()
+  internals.focusStartPosition({ stream, offset: stream.text.indexOf(ASSISTANT_TEXT) + 3 })
+  equal(caret().style.display, 'block', 'the caret is blinking before the pick')
+
   await longPress(harness)
+  equal(internals.state.picking, true, 'the hold armed the picker')
+  equal(hint().style.display, 'block', 'the pick bubble is up')
+
+  // Clicking empty space is one of the "other operations": it cancels.
   harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: 5, clientY: 5, pointerId: 3, button: 0 })
-  equal(internals.state.pickStage, 'armed', 'a miss keeps the picker armed')
-  equal(document.querySelector('.sh-vk-caret').style.display, 'none', 'and shows no caret')
-  equal(document.body.style.cursor, 'crosshair', 'and stays ready for another click')
-  equal(document.querySelector('.sh-vk-hint').style.display, 'block', 'and keeps the pick bubble up')
-  harness.runtime.dispatch(instance, document, 'pointerup', { clientX: 5, clientY: 5, pointerId: 3 })
-  equal(internals.state.reading, false, 'a miss does not start reading')
+  equal(internals.state.picking, false, 'a click on empty space cancels the pick')
+  equal(internals.state.pickStage, 'idle', 'back to idle')
+  equal(hint().style.display, 'none', 'the pick bubble is down')
+  equal(caret().style.display, 'none', 'and the caret stopped blinking')
+  equal(document.body.style.cursor, '', 'the pointer is restored')
+  equal(internals.state.reading, false, 'nothing is read')
   harness.dispose()
 })
 

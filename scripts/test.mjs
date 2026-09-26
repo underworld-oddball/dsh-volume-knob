@@ -1063,12 +1063,18 @@ await test('finishing or cancelling rests the caret on the newest question, unbl
   equal(internals.state.cursor.offset, parked.offset, 'at the same first character')
   assert(questionSegment, 'the newest question is readable')
   equal(questionStart >= 0, true, 'the question start is in the stream')
+
+  // The resting marker is on the *newest* question, not on the older one nor on
+  // the reply the reading had reached.
+  equal(internals.resolveCursor().segment.key, 'u2', 'the resting anchor is the newest question')
+  const older = internals.readableFlow().find((entry) => entry.key === 'u1')
+  assert(older, 'there is an older question to confuse it with')
+  assert(internals.resolveCursor().segment.key !== 'u1', 'never the older question')
   harness.dispose()
 })
 
-await test('stopping the reading by hand still just clears the caret', async () => {
-  // The user's spec covers "reading ends" and "cancelled"; an explicit stop has
-  // always meant "put the marker away", and that is kept as it was.
+await test('stopping the reading by hand also rests the caret on the newest question', async () => {
+  // 再次点击停止朗读：光标回到最后一次提问的位置，不用闪烁。
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1084,7 +1090,11 @@ await test('stopping the reading by hand still just clears the caret', async () 
   equal(caret().style.display, 'block', 'the caret is blinking while reading')
   click()
   equal(internals.state.reading, false, 'stopped')
-  equal(caret().style.display, 'none', 'and the marker is put away')
+  equal(document.body.style.cursor, '', 'the crosshair is gone')
+  equal(caret().style.display, 'block', 'the marker is still on the page')
+  equal(caret().dataset.mode, 'quiet', 'resting, not blinking')
+  equal(internals.state.cursor.key, 'u2', 'on the newest question')
+  equal(internals.state.cursor.offset, 0, 'at its first character')
   harness.dispose()
 })
 
@@ -1331,7 +1341,7 @@ await test('the caret is a gradient bar with a breathing pulse and two colour mo
   harness.dispose()
 })
 
-await test('a second icon click stops the reading and clears the caret', async () => {
+await test('a second icon click stops the reading and rests the caret', async () => {
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1353,7 +1363,10 @@ await test('a second icon click stops the reading and clears the caret', async (
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 4, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 4 })
   equal(internals.state.reading, false, 'the second click stopped the reading')
-  equal(caret().style.display, 'none', 'and the caret is gone')
+  equal(caret().style.display, 'block', 'the marker is still on the page')
+  equal(caret().dataset.mode, 'quiet', 'resting, not blinking')
+  equal(internals.state.cursor.key, 'u2', 'on the newest question')
+  equal(internals.state.cursor.offset, 0, 'at its first character')
   equal(document.body.style.cursor, '', 'the cursor is restored')
   harness.dispose()
 })

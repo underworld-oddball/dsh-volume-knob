@@ -376,7 +376,7 @@ function createHarness (options = {}) {
   }
 
   const settle = async () => { await new Promise((resolve) => realSetTimeout(resolve, 0)) }
-  /** Real time passes: the double-click window is measured in wall-clock ms. */
+  /** Real time passes: the hold threshold is measured in wall-clock ms. */
   const sleep = (ms) => new Promise((resolve) => realSetTimeout(resolve, ms))
 
   /** End the clip that is still playing (the `holdAudio` counterpart). */
@@ -585,16 +585,18 @@ function createReactRuntime (window) {
 console.log('sh-volume-shuff — client bundle tests\n')
 
 /**
- * One double-click on the icon: two presses released inside the double-click
- * window. The first release must not read, the second arms the picker.
+ * One press-and-hold on the icon, as a browser delivers it: press, move a
+ * single pixel, wait out the hold threshold (the picker arms while the button
+ * is still down), then release.
  */
-const doubleClick = (harness) => {
+const longPress = async (harness) => {
   const { instance, document } = harness
   const button = document.querySelector('#mount-right button')
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
-  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 100, clientY: 700, pointerId: 1 })
-  harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 2, button: 0 })
-  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 100, clientY: 700, pointerId: 2 })
+  harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
+  await harness.sleep(450) // the hold threshold is wall-clock, like the real one
+  harness.flushTimers() // the harness queues window timers; fire the hold one
+  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
 }
 
 await test('bundle registers the 0.1.7 slot contract', async () => {
@@ -693,16 +695,14 @@ await test('clicking again stops playback', async () => {
   await harness.settle()
   equal(internals.state.reading, true, 'reading while the clip plays')
   equal(document.querySelector('#mount-right button').getAttribute('aria-pressed'), 'true', 'the button reports playing')
-  // A second click long after the first is a click, not the second half of a
-  // double-click, so it stops the reading.
-  await harness.sleep(450)
+  // A second click is a click, not a hold: it stops the reading.
   click()
   equal(internals.state.reading, false, 'stopped after the second click')
   assert(harness.audioQueue.some((node) => node.paused), 'the clip was paused')
   harness.dispose()
 })
 
-await test('a double-click arms the picker and the page click picks the start and reads', async () => {
+await test('holding the icon arms the picker and the page click picks the start and reads', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = () => document.querySelector('#mount-right button')
@@ -710,19 +710,21 @@ await test('a double-click arms the picker and the page click picks the start an
   const box = reply.getBoundingClientRect()
   const caret = () => document.querySelector('.sh-vk-caret')
   const hint = () => document.querySelector('.sh-vk-hint') || { style: {}, textContent: '' }
-  // Two presses inside the double-click window are one double-click.
-  // A release cannot know that a second press is coming, so the first release
-  // behaves like a plain click; the second press takes that back and arms the
-  // picker — the reading never survives a double-click.
+  // A fresh press does not arm anything: the hold threshold has to pass first.
   harness.runtime.dispatch(instance, button(), 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
-  harness.runtime.dispatch(instance, button(), 'pointerup', { clientX: 100, clientY: 700, pointerId: 1 })
-  equal(internals.state.picking, false, 'the first release does not arm the picker yet')
-  harness.runtime.dispatch(instance, button(), 'pointerdown', { clientX: 100, clientY: 700, pointerId: 2, button: 0 })
-  harness.runtime.dispatch(instance, button(), 'pointerup', { clientX: 100, clientY: 700, pointerId: 2 })
-  equal(internals.state.picking, true, 'the double-click armed the picker')
+  harness.runtime.dispatch(instance, button(), 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
+  equal(internals.state.picking, false, 'a fresh press does not arm the picker')
+  equal(document.querySelector('.sh-vk-hint'), null, 'and no bubble is up yet')
+  // Hold past the threshold: the picker arms while the button is still down, so
+  // the release cannot turn into a read.
+  await harness.sleep(450)
+  harness.flushTimers()
+  equal(internals.state.picking, true, 'the hold armed the picker')
   equal(internals.state.pickStage, 'armed', 'stage = armed')
-  equal(internals.state.reading, false, 'and the click it interrupted is not reading')
-  equal(hint().style.display, 'block', 'the pick bubble shows right after the double-click')
+  equal(document.querySelector('.sh-vk-hint').style.display, 'block', 'the pick bubble comes up during the hold')
+  harness.runtime.dispatch(instance, button(), 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
+  equal(internals.state.reading, false, 'the release after a hold does not read')
+  equal(hint().style.display, 'block', 'the pick bubble is still up after the release')
   includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
   equal(caret().style.display, 'none', 'no caret while the page click is awaited')
@@ -752,18 +754,17 @@ await test('a double-click arms the picker and the page click picks the start an
   assert(plan.offset > stream.text.indexOf(ASSISTANT_TEXT), 'reading begins inside the clicked answer')
   includes(ASSISTANT_TEXT, plan.text.slice(0, 12), 'and from the clicked character')
 
-  // The third state: a fresh double-click while reading stops it and arms again.
+  // A hold also works right after a reading: it arms the picker the same way.
   internals.stopReading()
-  doubleClick(harness)
-  equal(internals.state.reading, false, 'a double-click during a reading stops it')
-  equal(internals.state.picking, true, 'and still arms the picker')
+  await longPress(harness)
+  equal(internals.state.picking, true, 'a hold after a reading arms the picker again')
   harness.dispose()
 })
 
 await test('the pick bubble replaces the hover bubble and is retired by the first pointer move', async () => {
-  // Regression: hovering shows the idle bubble, and a double-click arms the
-  // picker while the pointer is still on the icon — so both bubbles used to be
-  // positioned above it and the pick wording was covered by the idle one.
+  // Regression: hovering shows the idle bubble, and holding the icon arms the
+  // picker while the pointer is still on it — so both bubbles used to sit above
+  // the icon and the pick wording was covered by the idle one.
   const harness = createHarness({ tts: false })
   const { instance, document, window, internals } = harness
   const button = () => document.querySelector('#mount-right button')
@@ -775,8 +776,8 @@ await test('the pick bubble replaces the hover bubble and is retired by the firs
   equal(tip().style.display, 'block', 'the idle bubble shows on hover')
   equal(hint(), null, 'and no pick bubble exists yet')
 
-  // The double-click happens without the pointer ever leaving the icon.
-  doubleClick(harness)
+  // The hold happens without the pointer ever leaving the icon.
+  await longPress(harness)
   equal(internals.state.picking, true, 'picker armed')
   equal(tip().style.display, 'none', 'the idle bubble is taken down')
   equal(hint().style.display, 'block', 'the pick bubble is the one on screen')
@@ -857,8 +858,8 @@ await test('an armed picker ignores a click that misses readable text', async ()
   const { instance, document, internals } = harness
   const reply = document.getElementById('reply')
   const box = reply.getBoundingClientRect()
-  // The double-click arms the picker; this miss must not place a caret or read.
-  doubleClick(harness)
+  // The hold arms the picker; this miss must not place a caret or read.
+  await longPress(harness)
   harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: 5, clientY: 5, pointerId: 3, button: 0 })
   equal(internals.state.pickStage, 'armed', 'a miss keeps the picker armed')
   equal(document.querySelector('.sh-vk-caret').style.display, 'none', 'and shows no caret')
@@ -872,7 +873,7 @@ await test('an armed picker ignores a click that misses readable text', async ()
 await test('Escape disarms the picker', async () => {
   const harness = createHarness({ tts: false })
   const { instance, document, internals } = harness
-  doubleClick(harness)
+  await longPress(harness)
   equal(internals.state.picking, true, 'armed')
   harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
   equal(internals.state.picking, false, 'Escape disarms')
@@ -885,7 +886,7 @@ await test('the picked position survives a re-render and the next click', async 
   const { instance, document, internals } = harness
   const reply = document.getElementById('reply')
   const box = reply.getBoundingClientRect()
-  doubleClick(harness)
+  await longPress(harness)
   harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3, button: 0 })
   harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3 })
   await harness.settle()
@@ -1003,19 +1004,19 @@ await test('the icon hover bubble shows both languages in the hint styling, not 
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
   equal(button.getAttribute('title'), null, 'no native system tooltip')
-  includes(button.getAttribute('aria-label'), '点击朗读；上滑调音量；双击选起点', 'accessible label carries the wording')
+  includes(button.getAttribute('aria-label'), '点击朗读；上滑调音量；按住选起点', 'accessible label carries the wording')
 
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
   const tip = document.querySelector('.sh-vk-tip')
   assert(tip, 'the hover bubble exists')
   equal(tip.style.display, 'block', 'and is visible on hover')
   // Chinese on top, English under it, one line each.
-  equal(tip.textContent, '点击朗读；上滑调音量；双击选起点Tap: Speak / Swipe ↑: Volume / Double-tap: Pick', 'both languages are in the bubble')
+  equal(tip.textContent, '点击朗读；上滑调音量；按住选起点Tap: Speak / Swipe ↑: Volume / Down: Pick', 'both languages are in the bubble')
   const lines = tip.querySelectorAll('.sh-vk-line')
   equal(lines.length, 2, 'two lines: Chinese and English')
-  equal(lines[0].textContent, '点击朗读；上滑调音量；双击选起点', 'the Chinese line comes first')
+  equal(lines[0].textContent, '点击朗读；上滑调音量；按住选起点', 'the Chinese line comes first')
   includes(lines[1].className, 'sh-vk-hint-en', 'the English caption has its own class')
-  equal(lines[1].textContent, 'Tap: Speak / Swipe ↑: Volume / Double-tap: Pick', 'the English caption wording')
+  equal(lines[1].textContent, 'Tap: Speak / Swipe ↑: Volume / Down: Pick', 'the English caption wording')
   const css = document.getElementById('sh-vk-style').textContent
   includes(css, '.sh-vk-hint, .sh-vk-tip', 'the bubble shares the hint stylesheet')
   includes(css, 'color: #c2410c', 'and the hint colour')
@@ -1057,9 +1058,9 @@ await test('a second icon click stops the reading and clears the caret', async (
   const box = reply.getBoundingClientRect()
   const caret = () => document.querySelector('.sh-vk-caret')
 
-  // pick a start position with a double-click + page click, which reads and
-  // leaves the caret on screen
-  doubleClick(harness)
+  // pick a start position with a hold + page click, which reads and leaves the
+  // caret on screen
+  await longPress(harness)
   harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: box.left + 40, clientY: box.top + 8, pointerId: 3, button: 0 })
   harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 40, clientY: box.top + 8, pointerId: 3 })
   await harness.settle()
@@ -1068,7 +1069,6 @@ await test('a second icon click stops the reading and clears the caret', async (
   equal(caret().style.display, 'block', 'the caret is visible while reading')
 
   // stop with a plain click on the icon — the caret must go away with the sound
-  await harness.sleep(450) // outside the double-click window: this is a click
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 4, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 4 })
   equal(internals.state.reading, false, 'the second click stopped the reading')

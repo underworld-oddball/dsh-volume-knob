@@ -819,6 +819,100 @@ await test('the pick bubble replaces the hover bubble and is retired by the firs
   harness.dispose()
 })
 
+await test('moving the mouse only retires the bubble: the pick stays armed', async () => {
+  // holdAudio keeps the clip "playing" so `reading` is stable across the awaits.
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+  const hint = () => document.querySelector('.sh-vk-hint')
+
+  // Arrive on the icon, then hold: the bubble replaces the hover one.
+  harness.runtime.dispatch(instance, button, 'pointerenter', {})
+  harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
+  harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
+  await harness.sleep(450)
+  harness.flushTimers()
+  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
+  equal(internals.state.picking, true, 'the hold armed the picker')
+  equal(hint().style.display, 'block', 'the pick bubble is up')
+
+  // A plain move is the one operation that does NOT cancel.
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
+  equal(hint().style.display, 'none', 'moving the mouse hides the bubble')
+  equal(internals.state.picking, true, 'but the picker stays armed')
+  equal(internals.state.pickStage, 'armed', 'and no start position is placed yet')
+
+  // The next click still reads from the chosen spot.
+  const reply = document.getElementById('reply')
+  const box = reply.getBoundingClientRect()
+  harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 9, button: 0 })
+  harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 9 })
+  await harness.settle()
+  await harness.settle()
+  equal(internals.state.reading, true, 'the click after the move still starts the reading')
+  harness.dispose()
+})
+
+await test('a key press during the pick cancels it and restores the hover bubble', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+  const tip = () => document.querySelector('.sh-vk-tip')
+  const hint = () => document.querySelector('.sh-vk-hint')
+
+  harness.runtime.dispatch(instance, button, 'pointerenter', {})
+  harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
+  harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
+  await harness.sleep(450)
+  harness.flushTimers()
+  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
+  equal(internals.state.picking, true, 'the hold armed the picker')
+  equal(hint().style.display, 'block', 'the pick bubble is up')
+
+  harness.runtime.dispatch(instance, document, 'keydown', { key: 'a' })
+  equal(internals.state.picking, false, 'a keystroke cancels the pick')
+  equal(hint().style.display, 'none', 'and takes the pick bubble down')
+  equal(document.body.style.cursor, '', 'and restores the pointer')
+  equal(internals.state.reading, false, 'nothing is read')
+  equal(tip().style.display, 'block', 'the hover bubble returns (the icon is hovered)')
+  includes(tip().textContent, '按住选起点', 'with the idle wording')
+
+  // With the picker gone the icon is a plain click target again.
+  harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 3, button: 0 })
+  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 3 })
+  await harness.settle()
+  await harness.settle()
+  equal(internals.state.reading, true, 'a later click reads again')
+  harness.dispose()
+})
+
+await test('a wheel turn, a drag, a context click or a blur all cancel the pick', async () => {
+  const operations = [
+    ['wheel', 'wheel', {}, 'document'],
+    ['drag', 'pointermove', { buttons: 1 }, 'document'],
+    ['context click', 'pointerdown', { button: 2, clientX: 320, clientY: 480 }, 'document'],
+    ['window blur', 'blur', {}, 'window'],
+  ]
+  for (const [label, type, event, target] of operations) {
+    const harness = createHarness({ tts: false })
+    const { instance, document, window, internals } = harness
+    const button = document.querySelector('#mount-right button')
+    const hint = () => document.querySelector('.sh-vk-hint')
+    harness.runtime.dispatch(instance, button, 'pointerenter', {})
+    harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
+    harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
+    await harness.sleep(450)
+    harness.flushTimers()
+    harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 101, clientY: 700, pointerId: 1 })
+    equal(internals.state.picking, true, `${label}: armed`)
+    harness.runtime.dispatch(instance, target === 'window' ? window : document, type, event)
+    equal(internals.state.picking, false, `${label}: cancels the pick`)
+    equal(hint().style.display, 'none', `${label}: bubble down`)
+    equal(internals.state.reading, false, `${label}: nothing is read`)
+    harness.dispose()
+  }
+})
+
 await test('the DOM map and the flattened text share one coordinate space', async () => {
   // Regression: walkText opens every block with a newline, and tidy() used to
   // trim that newline off the *string* while leaving the map's offsets alone.

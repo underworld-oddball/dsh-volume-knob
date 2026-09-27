@@ -1217,6 +1217,10 @@ await test('a pick that keeps being moved but never clicked still times out and 
   equal(internals.state.cursor, null, 'and no stored position either')
   equal(document.body.style.cursor, '', 'the pointer is back to normal')
   equal(internals.state.reading, false, 'nothing was read')
+  // And the reason is on the record, so a live session can be audited.
+  const cancels = harness.requests.filter((entry) => entry.path === '/sh-volume-shuff/diag' && entry.body && entry.body.event === 'gesture:pick-cancel')
+  equal(cancels.length, 1, 'one cancellation was reported')
+  equal(cancels[0].body.detail, 'idle-timeout', 'and it says why: the idle timeout')
   harness.dispose()
 })
 

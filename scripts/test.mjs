@@ -745,7 +745,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   equal(internals.state.picking, false, 'a fresh press does not arm the picker')
   equal(document.querySelector('.sh-vk-hint'), null, 'and no pick bubble is up yet')
   equal(document.querySelector('.sh-vk-tip').style.display, 'block', 'the hover bubble stays up while holding')
-  includes(document.querySelector('.sh-vk-tip').textContent, '按住选起点', 'and it still carries the idle wording')
+  includes(document.querySelector('.sh-vk-tip').textContent, '长按选起点', 'and it still carries the idle wording')
   // Hold past the threshold, then release: the release is what changes the
   // bubble and arms the picker, and it must not turn into a read.
   await harness.sleep(450)
@@ -1316,25 +1316,28 @@ await test('the icon hover bubble shows both languages in the hint styling, not 
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
   equal(button.getAttribute('title'), null, 'no native system tooltip')
-  includes(button.getAttribute('aria-label'), '点击朗读；上滑调音量；按住选起点', 'accessible label carries the wording')
+  includes(button.getAttribute('aria-label'), '点击朗读；长按选起点；上滑调音量', 'accessible label carries the wording')
 
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
   const tip = document.querySelector('.sh-vk-tip')
   assert(tip, 'the hover bubble exists')
   equal(tip.style.display, 'block', 'and is visible on hover')
-  // Chinese on top, English under it, one line each.
-  equal(tip.textContent, '点击朗读；上滑调音量；按住选起点Tap: Speak / Swipe ↑: Volume / Hold: Pick', 'both languages are in the bubble')
-  const lines = tip.querySelectorAll('.sh-vk-line')
-  equal(lines.length, 2, 'two lines: Chinese and English')
-  equal(lines[0].textContent, '点击朗读；上滑调音量；按住选起点', 'the Chinese line comes first')
-  includes(lines[1].className, 'sh-vk-hint-en', 'the English caption has its own class')
-  equal(lines[1].textContent, 'Tap: Speak / Swipe ↑: Volume / Hold: Pick', 'the English caption wording')
+  // Three gesture columns, each with its Chinese label above the English caption.
+  const columns = tip.querySelectorAll('.sh-vk-opt')
+  equal(columns.length, 3, 'three gesture columns')
+  const cn = [...tip.querySelectorAll('.sh-vk-cn')].map((node) => node.textContent)
+  const en = [...tip.querySelectorAll('.sh-vk-en')].map((node) => node.textContent)
+  equal(cn.join(' | '), '点击朗读 | 长按选起点 | 上滑调音量', 'Chinese labels, left to right')
+  equal(en.join(' | '), '[Tap: Speak] | [Hold: Pick] | [Swipe ↑: Volume]', 'English captions under their own column')
+  equal(columns[0].querySelector('.sh-vk-en').textContent, '[Tap: Speak]', 'column 1 pairs Tap with 点击朗读')
+  equal(columns[2].querySelector('.sh-vk-cn').textContent, '上滑调音量', 'column 3 is the volume gesture')
   const css = document.getElementById('sh-vk-style').textContent
   includes(css, '.sh-vk-hint, .sh-vk-tip', 'the bubble shares the hint stylesheet')
   includes(css, 'color: #c2410c', 'and the hint colour')
   includes(css, 'color: #9ca3af', 'the English caption is grey')
-  includes(css, 'text-align: left', 'both lines align to the same left edge')
-  includes(css, 'white-space: nowrap', 'and neither line wraps into the other')
+  includes(css, '.sh-vk-grid', 'the idle bubble is laid out as a grid')
+  includes(css, 'flex-direction: column', 'each column stacks its own two lines')
+  includes(css, 'white-space: nowrap', 'and nothing wraps into its neighbour')
   harness.runtime.dispatch(instance, button, 'pointerleave', {})
   equal(tip.style.display, 'none', 'and hides when the pointer leaves')
 

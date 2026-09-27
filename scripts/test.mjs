@@ -1116,6 +1116,30 @@ await test('only one caret node ever exists, and a stop removes it', async () =>
   harness.dispose()
 })
 
+await test('a stacked pair is centred; the idle columns stay left aligned', async () => {
+  const harness = createHarness({ tts: false })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+
+  // Idle: three columns, left aligned as a grid.
+  harness.runtime.dispatch(instance, button, 'pointerenter', {})
+  const tip = document.querySelector('.sh-vk-tip')
+  internals.alignBubble(tip, 420) // a real layout would measure the grid this wide
+  equal(tip.dataset.stack, 'row', 'the idle bubble is laid out as columns')
+
+  // A pick prompt is a stacked pair: centred under one another.
+  const hint = document.createElement('div')
+  hint.className = 'sh-vk-hint'
+  document.body.append(hint)
+  internals.alignBubble(hint, 120)
+  equal(hint.dataset.stack, 'center', 'a narrow bubble is a stacked pair')
+
+  const css = document.getElementById('sh-vk-style').textContent
+  includes(css, '.sh-vk-hint[data-stack="center"], .sh-vk-tip[data-stack="center"]', 'the stylesheet centres stacked pairs')
+  includes(css, 'text-align: center', 'with a real text-align rule')
+  harness.dispose()
+})
+
 await test('the DOM map and the flattened text share one coordinate space', async () => {
   // Regression: walkText opens every block with a newline, and tidy() used to
   // trim that newline off the *string* while leaving the map's offsets alone.

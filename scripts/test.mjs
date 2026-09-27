@@ -1224,6 +1224,47 @@ await test('a pick that keeps being moved but never clicked still times out and 
   harness.dispose()
 })
 
+await test('while the picker is live the page keeps the pick cursor, even on the icon', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+  const root = document.documentElement
+
+  equal(root.classList.contains('sh-vk-picking'), false, 'no pick cursor class before the gesture')
+
+  await longPress(harness)
+  equal(internals.state.picking, true, 'picker armed')
+  equal(root.classList.contains('sh-vk-picking'), true, 'the page switches to the pick cursor')
+  equal(document.body.style.cursor, 'crosshair', 'and the body cursor follows')
+  const css = document.getElementById('sh-vk-style').textContent
+  includes(css, 'html.sh-vk-picking', 'the stylesheet targets the root class')
+  includes(css, 'cursor: crosshair !important', 'and outranks the icon inline cursor: pointer')
+  assert(css.includes('html.sh-vk-picking *'), 'the override covers every element on the page')
+  equal(button.style.cursor, 'pointer', 'the icon still declares its own hand cursor (overridden while picking)')
+
+  // Moving around mid-pick must not end it or change the shape.
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
+  equal(root.classList.contains('sh-vk-picking'), true, 'still the pick cursor after a move')
+
+  // Picking a spot ends the session and restores the normal cursor.
+  const reply = document.getElementById('reply')
+  const box = reply.getBoundingClientRect()
+  harness.runtime.dispatch(instance, document, 'pointerdown', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3, button: 0 })
+  harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3 })
+  await harness.settle()
+  equal(internals.state.picking, false, 'the pick committed')
+  equal(root.classList.contains('sh-vk-picking'), false, 'and the pick cursor is gone')
+  equal(document.body.style.cursor, '', 'the body cursor is restored')
+
+  // A cancelled pick restores it too.
+  await longPress(harness)
+  equal(root.classList.contains('sh-vk-picking'), true, 'armed again')
+  harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
+  equal(internals.state.picking, false, 'cancelled')
+  equal(root.classList.contains('sh-vk-picking'), false, 'and restored')
+  harness.dispose()
+})
+
 await test('the DOM map and the flattened text share one coordinate space', async () => {
   // Regression: walkText opens every block with a newline, and tidy() used to
   // trim that newline off the *string* while leaving the map's offsets alone.

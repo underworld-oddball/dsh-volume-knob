@@ -1,7 +1,7 @@
 {
   "name": "sh-volume-shuff",
   "version": "0.1.0",
-  "description": "Read the newest turn aloud from the DSH composer: a speaker button right of the microphone that reads from the start of your newest question, scrolls the page to that spot and marks it with a blinking caret on one click, stops on the next, picks any other reading start position by double-clicking the icon and then clicking the spot, and opens a vertical volume mixer (in-page media volume + system output) on press-and-drag-up.",
+  "description": "Read the newest turn aloud from the DSH composer: a speaker button in the composer tool row, left of the model selector, that reads from the start of your newest question, scrolls the page to that spot and marks it with a blinking caret on one click, stops on the next, picks any other reading start position by double-clicking the icon and then clicking the spot, and opens a vertical volume mixer (in-page media volume + system output) on press-and-drag-up.",
   "license": "MIT",
   "author": "江湖老妖",
   "publishConfig": {

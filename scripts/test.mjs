@@ -758,7 +758,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   equal(document.querySelector('.sh-vk-tip').style.display, 'none', 'and the hover bubble steps aside')
   equal(hint().style.display, 'block', 'the pick bubble takes its place')
   harness.flushTimers(1000) // only the sub-second timers; the 5s idle one must stay pending
-  includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
+  includes(hint().textContent, '选择位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
   assert(!caret() || caret().style.display === 'none', 'no caret while the page click is awaited')
   equal(document.body.style.cursor, 'crosshair', 'the page invites a click')
@@ -814,7 +814,7 @@ await test('the pick bubble replaces the hover bubble and is retired by the firs
   equal(internals.state.picking, true, 'picker armed')
   equal(tip().style.display, 'none', 'the idle bubble is taken down')
   equal(hint().style.display, 'block', 'the pick bubble is the one on screen')
-  equal(hint().textContent.slice(0, 9), '选择开始位置后点击', 'and it carries the pick wording')
+  assert(hint().textContent.startsWith('选择位置后点击'), 'and it carries the pick wording')
   assert(hint().style.top && hint().style.left, 'the pick bubble was placed (jsdom has no paint, so only placement is checkable)')
 
   // A re-fired pointerenter must not bring the idle bubble back while picking.

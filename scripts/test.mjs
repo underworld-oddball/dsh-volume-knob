@@ -758,7 +758,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   equal(document.querySelector('.sh-vk-tip').style.display, 'none', 'and the hover bubble steps aside')
   equal(hint().style.display, 'block', 'the pick bubble takes its place')
   harness.flushTimers(1000) // only the sub-second timers; the 5s idle one must stay pending
-  includes(hint().textContent, '选择位置后点击', 'the pick wording')
+  includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
   assert(!caret() || caret().style.display === 'none', 'no caret while the page click is awaited')
   equal(document.body.style.cursor, 'crosshair', 'the page invites a click')
@@ -823,7 +823,7 @@ await test('the pick bubble replaces the hover bubble and is retired by the firs
   equal(internals.state.picking, true, 'picker armed')
   equal(tip().style.display, 'none', 'the idle bubble is taken down')
   equal(hint().style.display, 'block', 'the pick bubble is the one on screen')
-  assert(hint().textContent.startsWith('选择位置后点击'), 'and it carries the pick wording')
+  assert(hint().textContent.startsWith('选择开始位置后点击'), 'and it carries the pick wording')
   assert(hint().style.top && hint().style.left, 'the pick bubble was placed (jsdom has no paint, so only placement is checkable)')
 
   // A re-fired pointerenter must not bring the idle bubble back while picking.
@@ -1178,6 +1178,45 @@ await test('a click always starts at the newest question, even after the arrows 
   await harness.settle()
   equal(internals.state.cursor.key, 'u2', 'keyboard activation also ignores the parked caret')
   equal(internals.state.cursor.offset, 0, 'and starts at the newest question')
+  harness.dispose()
+})
+
+await test('a pick that keeps being moved but never clicked still times out and clears everything', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const caret = () => document.querySelector('.sh-vk-caret')
+  const hint = () => document.querySelector('.sh-vk-hint')
+  const idleTimer = () => [...harness.pendingTimers.entries()].filter(([, entry]) => entry.ms === 5000)
+
+  await longPress(harness)
+  equal(internals.state.picking, true, 'the hold armed the picker')
+  equal(idleTimer().length, 1, 'the 5s countdown starts the moment the picker arms')
+  equal(hint().style.display, 'block', 'the pick bubble is up')
+
+  // Move: the bubble goes, the countdown restarts (moving must never cancel).
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
+  equal(hint().style.display, 'none', 'moving retires the bubble')
+  equal(idleTimer().length, 1, 'and leaves exactly one countdown pending')
+  await harness.sleep(1200)
+  equal(internals.state.picking, true, 'still armed 1.2s after the move')
+
+  // Move again, still without clicking any text.
+  harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 340, clientY: 500 })
+  equal(idleTimer().length, 1, 'the second move replaces the countdown')
+  await harness.sleep(1200)
+  equal(internals.state.picking, true, 'still armed 1.2s after the second move')
+
+  // Stop moving and never click: the countdown is the only thing left.
+  const idle = idleTimer()[0]
+  assert(idle, 'a countdown is pending')
+  assert(harness.runTimer(idle[0]), 'it fires')
+  equal(internals.state.picking, false, 'the pick cancels itself')
+  equal(internals.state.pickStage, 'idle', 'back to idle')
+  equal(hint().style.display, 'none', 'the bubble is gone')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'no caret node is left')
+  equal(internals.state.cursor, null, 'and no stored position either')
+  equal(document.body.style.cursor, '', 'the pointer is back to normal')
+  equal(internals.state.reading, false, 'nothing was read')
   harness.dispose()
 })
 

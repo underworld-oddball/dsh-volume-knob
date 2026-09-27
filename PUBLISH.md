@@ -135,4 +135,56 @@ dsh plugin --profile web add sh-volume-shuff          # 已发 npm
 dsh plugin --profile web add github:underworld-oddball/sh-volume-shuff   # 未发 npm 时的等价写法
 ```
 
+## 8. 首次发布的实战记录（2026-09-27，0.1.0）
+
+前半部分写的是理想流程；下面是真做时撞上、值得记下来的几件事。
+
+**① 发布没有网页入口。** npmjs.com 上只能注册/登录/建 token/配 Trusted Publisher，`npm publish` 必须走终端或 CI。
+
+**② 账号 2FA 用「安全密钥」会挡住终端发布。** 安全密钥（Touch ID / YubiKey）只能在浏览器里用，而终端只会要 6 位 TOTP，于是报：
+
+```
+EOTP This operation requires a one-time password from your authenticator
+```
+
+当时网页的 2FA 向导只给 Security key、不给 TOTP，所以要么给账号补一个 TOTP，要么用第 ③ 条。
+
+**③ 首次发布用「granular token + Bypass 2FA」。** 0.1.0 就是这么发出去的：
+
+- <https://www.npmjs.com/settings/你的用户名/tokens> → Generate New Token → **Granular Access Token**
+- Permissions → Packages：**Read and write (publish and stage)**（别选 stage only，那个要人工批准）
+- Select packages：包还没发布时只能选 **All packages**
+- **Bypass two-factor authentication (2FA)** ✅ 勾上；Allowed IP ranges 留空；有效期 30 天
+
+写进配置 —— **先在浏览器复制 token，再立刻运行**（`pbpaste` 读的是剪贴板，中间别再复制别的东西，否则会把命令文本写进配置文件）：
+
+```sh
+printf '//registry.npmjs.org/:_authToken=%s\n' "$(pbpaste)" > ~/.npmrc
+npm whoami     # 应输出用户名
+```
+
+**④ 新包默认要求 2FA。** 包页面会挂一句 `2FA has been enabled for this package`，所以终端发布必然要 OTP —— 这正是 ② ③ 存在的原因。配好 Trusted Publisher 后 CI 发布不受影响。
+
+**⑤ 配 Trusted Publisher 之前，账号必须先有 2FA 方法。** 账号没有的话，打开 `/access` 会被弹到 2FA 向导；照着走完（Security key + **保存恢复码**）才能继续。
+
+**⑥ Allowed actions 必须勾 `Allow npm publish`。** 页面默认只给 `npm stage publish`，不勾的话工作流里那句 `npm publish --provenance` 会失败或卡在待批准。
+
+**⑦ 别把「网页上传」和「git 推送」混着用。** 网页上传产生的是一次性提交，会和本地历史分叉，之后 `git push` 直接被拒。两种收场：
+
+```sh
+# 让远端采纳本地历史（文件内容一致时零损失）
+git fetch origin && git push --force-with-lease origin main
+# 或者让本地跟随远端
+git fetch origin && git reset --soft origin/main
+```
+
+**⑧ 日常发版**（推荐路径；不灵时再回第 ③ 条手工发）：
+
+```sh
+# 改 package.json 的 version，例如 0.1.1
+git commit -am "sh-volume-shuff 0.1.1"
+git tag v0.1.1
+git push && git push --tags
+```
+
 

@@ -964,8 +964,8 @@ await test('the pick times out even when the mouse never moves after the release
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'the idle pick cancels itself')
   equal(hint().style.display, 'none', 'the bubble is gone')
-  equal(caret().style.display, 'block', 'a resting marker is left on the page')
-  equal(caret().dataset.mode, 'quiet', 'and it does not blink')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'no caret node is left behind')
+  equal(internals.state.cursor, null, 'and the stored position is dropped')
   equal(document.body.style.cursor, '', '光标回到初始状态')
   equal(internals.state.reading, false, 'and nothing was read')
   harness.dispose()
@@ -999,8 +999,8 @@ await test('a pick that is left idle after the move times out and cancels itself
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'the idle pick cancels itself')
   equal(internals.state.pickStage, 'idle', 'back to idle')
-  equal(caret().style.display, 'block', 'the caret is still drawn')
-  equal(caret().dataset.mode, 'quiet', 'but it stopped blinking')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'the caret node is gone')
+  equal(internals.state.cursor, null, 'and the stored position is dropped')
   equal(document.body.style.cursor, '', 'the pointer is back to normal')
   harness.dispose()
 })
@@ -1026,7 +1026,7 @@ await test('every mouse move resets the idle countdown', async () => {
   harness.dispose()
 })
 
-await test('finishing or cancelling rests the caret on the newest question, unblinking', async () => {
+await test('finishing rests the caret on the newest question; cancelling removes it', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const caret = () => document.querySelector('.sh-vk-caret')
@@ -1058,9 +1058,10 @@ await test('finishing or cancelling rests the caret on the newest question, unbl
   equal(internals.state.picking, true, 'picker armed')
   harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
   equal(internals.state.picking, false, 'the pick was cancelled')
-  equal(caret().dataset.mode, 'quiet', 'the cancelled pick also rests the caret')
-  equal(internals.state.cursor.key, parked.key, 'on the newest question')
-  equal(internals.state.cursor.offset, parked.offset, 'at the same first character')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'the cancelled pick leaves no caret')
+  equal(internals.state.cursor, null, 'and drops the stored position')
+  // The natural finish above did park the caret at the newest question.
+  equal(parked.key, 'u2', 'the finished reading had parked on the newest question')
   assert(questionSegment, 'the newest question is readable')
   equal(questionStart >= 0, true, 'the question start is in the stream')
 
@@ -1073,8 +1074,8 @@ await test('finishing or cancelling rests the caret on the newest question, unbl
   harness.dispose()
 })
 
-await test('stopping the reading by hand also rests the caret on the newest question', async () => {
-  // 再次点击停止朗读：光标回到最后一次提问的位置，不用闪烁。
+await test('stopping the reading by hand takes the marker away entirely', async () => {
+  // 再次点击停止朗读：标记彻底消失；起点仍是最后一次提问的第一个字。
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1091,14 +1092,18 @@ await test('stopping the reading by hand also rests the caret on the newest ques
   click()
   equal(internals.state.reading, false, 'stopped')
   equal(document.body.style.cursor, '', 'the crosshair is gone')
-  equal(caret().style.display, 'block', 'the marker is still on the page')
-  equal(caret().dataset.mode, 'quiet', 'resting, not blinking')
-  equal(internals.state.cursor.key, 'u2', 'on the newest question')
-  equal(internals.state.cursor.offset, 0, 'at its first character')
+  assert(!caret() || caret().style.display === 'none', 'the marker is gone from the page')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'and no caret node is left behind')
+  equal(internals.state.cursor, null, 'the stored position is dropped')
+  // The reading start is still the newest question's first character.
+  const plan = internals.readingPlan()
+  const stream = internals.messageIndex()
+  const questionStart = stream.text.indexOf(USER_TEXT)
+  equal(plan.offset, questionStart, 'the next reading starts at the newest question again')
   harness.dispose()
 })
 
-await test('only one caret node survives, and the resting one carries animation:none inline', async () => {
+await test('only one caret node ever exists, and a stop removes it', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1124,11 +1129,9 @@ await test('only one caret node survives, and the resting one carries animation:
   const live = carets()[0]
   equal(live.style.animation, '', 'while reading the pulse comes from the stylesheet')
 
-  click() // stop: the marker comes to rest
-  equal(carets().length, 1, 'still exactly one caret')
-  equal(carets()[0].dataset.mode, 'quiet', 'it is the resting marker')
-  equal(carets()[0].style.animation, 'none', 'with the pulse switched off inline')
-  equal(internals.state.cursor.key, 'u2', 'parked on the newest question')
+  click() // stop: the marker goes away with the sound
+  equal(carets().length, 0, 'no caret node is left on the page')
+  equal(document.body.style.cursor, '', 'and the pointer is back to normal')
   harness.dispose()
 })
 
@@ -1166,7 +1169,7 @@ await test('the DOM map and the flattened text share one coordinate space', asyn
   harness.dispose()
 })
 
-await test('a click on empty space cancels the pick and rests the caret', async () => {
+await test('a click on empty space cancels the pick and removes the caret', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1188,8 +1191,8 @@ await test('a click on empty space cancels the pick and rests the caret', async 
   equal(internals.state.picking, false, 'a click on empty space cancels the pick')
   equal(internals.state.pickStage, 'idle', 'back to idle')
   equal(hint().style.display, 'none', 'the pick bubble is down')
-  equal(caret().style.display, 'block', 'and the caret is still drawn')
-  equal(caret().dataset.mode, 'quiet', 'but no longer blinking')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'and the caret node is gone')
+  equal(internals.state.cursor, null, 'with the stored position dropped')
   equal(document.body.style.cursor, '', 'the pointer is restored')
   equal(internals.state.reading, false, 'nothing is read')
   harness.dispose()
@@ -1206,7 +1209,7 @@ await test('Escape disarms the picker', async () => {
   harness.dispose()
 })
 
-await test('the picked position survives a re-render and the next click', async () => {
+await test('a stopped reading restarts at the newest question, not at the old pick', async () => {
   const harness = createHarness({ tts: false })
   const { instance, document, internals } = harness
   const reply = document.getElementById('reply')
@@ -1216,17 +1219,18 @@ await test('the picked position survives a re-render and the next click', async 
   harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3 })
   await harness.settle()
   await harness.settle()
+  const picked = internals.state.cursor.offset
   internals.stopReading()
-  const first = { ...internals.state.cursor }
+  equal(internals.state.cursor, null, 'stopping drops the picked position')
   const button = document.querySelector('#mount-right button')
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 3, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 3 })
   await harness.settle()
   await harness.settle()
-  internals.stopReading()
-  equal(internals.state.cursor.offset, first.offset, 'the caret did not jump back to the default')
-  const plan = internals.readingPlan()
-  includes(plan.text, ASSISTANT_TEXT.slice(first.offset, first.offset + 8), 'still reading from the picked character')
+  const stream = internals.messageIndex()
+  const questionStart = stream.text.indexOf(USER_TEXT)
+  equal(internals.readingPlan().offset, questionStart, 'the next reading restarts at the newest question')
+  assert(questionStart !== picked, 'which is a different character from the old pick')
   harness.dispose()
 })
 
@@ -1375,7 +1379,7 @@ await test('the caret is a gradient bar with a breathing pulse and two colour mo
   harness.dispose()
 })
 
-await test('a second icon click stops the reading and rests the caret', async () => {
+await test('a second icon click stops the reading and removes the caret', async () => {
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
@@ -1397,10 +1401,9 @@ await test('a second icon click stops the reading and rests the caret', async ()
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 4, button: 0 })
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 4 })
   equal(internals.state.reading, false, 'the second click stopped the reading')
-  equal(caret().style.display, 'block', 'the marker is still on the page')
-  equal(caret().dataset.mode, 'quiet', 'resting, not blinking')
-  equal(internals.state.cursor.key, 'u2', 'on the newest question')
-  equal(internals.state.cursor.offset, 0, 'at its first character')
+  assert(!caret() || caret().style.display === 'none', 'the marker is gone')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'no caret node remains')
+  equal(internals.state.cursor, null, 'the stored position is dropped')
   equal(document.body.style.cursor, '', 'the cursor is restored')
   harness.dispose()
 })

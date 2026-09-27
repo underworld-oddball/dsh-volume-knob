@@ -782,10 +782,19 @@ await test('holding the icon arms the picker and the page click picks the start 
   equal(internals.state.reading, true, 'the reading started from the clicked character')
   equal(hint().style.display, 'none', 'the pick bubble is gone')
   equal(document.body.style.cursor, '', 'the cursor is restored')
-  const plan = internals.readingPlan()
+  // The pick passes its own start: the reading that just started reports a
+  // stream offset inside the clicked answer, while a plain click reports the
+  // newest question's first character.
   const stream = internals.messageIndex()
-  assert(plan.offset > stream.text.indexOf(ASSISTANT_TEXT), 'reading begins inside the clicked answer')
-  includes(ASSISTANT_TEXT, plan.text.slice(0, 12), 'and from the clicked character')
+  const startEvents = harness.requests
+    .filter((entry) => entry.path === '/sh-volume-shuff/diag' && entry.body && entry.body.event === 'read:start')
+  assert(startEvents.length > 0, 'the reading start was reported')
+  const startedAt = JSON.parse(startEvents[startEvents.length - 1].body.detail).offset
+  assert(startedAt > stream.text.indexOf(ASSISTANT_TEXT), `the pick read from inside the answer (got ${startedAt})`)
+  // Ending the reading drops the picked position; a plain click then starts at
+  // the newest question again.
+  internals.stopReading()
+  equal(internals.readingPlan().offset, stream.text.indexOf(USER_TEXT), 'a plain click still starts at the newest question')
 
   // A hold also works right after a reading: it arms the picker the same way.
   internals.stopReading()
@@ -1137,6 +1146,38 @@ await test('a stacked pair is centred; the idle columns stay left aligned', asyn
   const css = document.getElementById('sh-vk-style').textContent
   includes(css, '.sh-vk-hint[data-stack="center"], .sh-vk-tip[data-stack="center"]', 'the stylesheet centres stacked pairs')
   includes(css, 'text-align: center', 'with a real text-align rule')
+  harness.dispose()
+})
+
+await test('a click always starts at the newest question, even after the arrows moved the caret', async () => {
+  const harness = createHarness({ tts: true, holdAudio: true })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+  const stream = internals.messageIndex()
+  const questionStart = stream.text.indexOf(USER_TEXT)
+
+  // Park the caret somewhere else entirely (the arrow keys' doing).
+  internals.state.cursor = { key: 'a1', offset: 10 }
+  equal(internals.readingPlan().offset, questionStart, 'the plan ignores the parked caret')
+  assert(internals.state.cursor.key === 'a1', 'the parked caret is still remembered for the arrows')
+
+  // A plain click must ignore it.
+  harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
+  harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
+  await harness.settle()
+  await harness.settle()
+  equal(internals.state.reading, true, 'reading')
+  equal(internals.state.cursor.key, 'u2', 'the reading started on the newest question')
+  equal(internals.state.cursor.offset, 0, 'at its first character')
+
+  // Enter does the same.
+  internals.stopReading()
+  internals.state.cursor = { key: 'a1', offset: 10 }
+  harness.runtime.dispatch(instance, button, 'keydown', { key: 'Enter' })
+  await harness.settle()
+  await harness.settle()
+  equal(internals.state.cursor.key, 'u2', 'keyboard activation also ignores the parked caret')
+  equal(internals.state.cursor.offset, 0, 'and starts at the newest question')
   harness.dispose()
 })
 

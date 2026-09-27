@@ -680,12 +680,8 @@ await test('click reads from the start of the newest question and scrolls there'
   assert(!spokenText.includes(OLD_ASSISTANT), 'does not read older replies')
   assert(!spokenText.includes('复制'), 'does not read action buttons')
     assert(layout.scrollCalls.length > 0, 'the page was scrolled to the start position')
-  const caret = document.querySelector('.sh-vk-caret')
-  assert(caret, 'the caret exists')
-  equal(caret.style.display, 'block', 'the caret is visible')
-  // The browser voice can finish before these assertions in the harness; both
-  // the reading caret and the resting marker are the same position on screen.
-  assert(['read', 'quiet'].includes(caret.dataset.mode), `caret mode is read or quiet (got ${caret.dataset.mode})`)
+  // However the voice timing falls, the reading ends with no marker left.
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'no marker is left behind at the end')
   const plan = harness.internals.readingPlan()
   includes(plan.text, USER_TEXT, 'plan starts at the question')
   assert(requests.some((entry) => entry.path === '/sh-volume-shuff/diag'), 'diagnostics were reported')
@@ -697,9 +693,11 @@ await test('click reads from the start of the newest question and scrolls there'
   equal(resolved.segment.kind, 'user', 'the start position lives on a question node')
   equal(resolved.segment.node.id, 'question', 'and specifically the newest one')
   const questionBox = document.getElementById('question').getBoundingClientRect()
-  const caretTop = harness.internals.state.rect && harness.internals.state.rect.top
-  assert(caretTop >= questionBox.top - 2 && caretTop <= questionBox.bottom + 2,
-    `the caret sits inside the question, not on the footer (caret ${caretTop}, question ${questionBox.top}..${questionBox.bottom})`)
+  const startStream = harness.internals.messageIndex()
+  const startRect = harness.internals.rectAtOffset(startStream, harness.internals.defaultStartOffset(startStream))
+  assert(startRect, 'the start character has a rectangle')
+  assert(startRect.top >= questionBox.top - 2 && startRect.top <= questionBox.bottom + 2,
+    `the start character sits inside the question, not on the footer (top ${startRect.top}, question ${questionBox.top}..${questionBox.bottom})`)
   assert(!plan.text.includes(TAIL_TEXT), 'the token/time footer is never read')
   harness.dispose()
 })
@@ -1026,51 +1024,34 @@ await test('every mouse move resets the idle countdown', async () => {
   harness.dispose()
 })
 
-await test('finishing rests the caret on the newest question; cancelling removes it', async () => {
+await test('finishing and cancelling both remove the caret', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
-  const caret = () => document.querySelector('.sh-vk-caret')
   const stream = internals.messageIndex()
   const questionStart = stream.text.indexOf(USER_TEXT)
-  const questionSegment = internals.readableFlow().find((entry) => entry.key === 'u2')
 
   // --- a reading that simply runs out ---------------------------------------
   internals.state.cursor = { key: 'a2resp', offset: 10 } // as if a pick had moved it
-  void internals.startReading() // its promise settles when the voice finishes
-  await harness.settle()
+  // Not awaited: with holdAudio the browser voice never ends, and the point is
+  // what finishing does to the marker. The state is set synchronously.
+  void internals.startReading()
   equal(internals.state.reading, true, 'reading')
-  assert(caret().dataset.mode !== 'quiet', 'the caret is not resting while reading')
+  assert(document.querySelector('.sh-vk-caret'), 'the caret is drawn while reading')
   internals.finishReading() // a reading that simply runs out
   equal(internals.state.reading, false, 'the reading finished')
-  equal(caret().style.display, 'block', 'the caret is still on the page')
-  equal(caret().dataset.mode, 'quiet', 'in its resting, non-blinking mode')
-  equal(internals.state.cursor.key, 'u2', 'and it sits on the newest question')
-  equal(internals.state.cursor.offset, 0, 'at the first character of that question')
-  const parked = { ...internals.state.cursor }
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'the finished reading leaves no marker')
+  equal(internals.state.cursor, null, 'and drops the stored position')
+  equal(internals.readingPlan().offset, questionStart, 'the next reading starts at the newest question')
 
-  // Scrolling must not wake the resting marker up.
-  harness.runtime.dispatch(instance, harness.window, 'scroll', {})
-  equal(caret().dataset.mode, 'quiet', 'still resting after a scroll')
-
-  // --- a pick that the operator cancels -------------------------------------
+  // --- a pick the operator cancels -------------------------------------------
   internals.state.cursor = { key: 'a2resp', offset: 12 }
   await longPress(harness)
   equal(internals.state.picking, true, 'picker armed')
   harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
   equal(internals.state.picking, false, 'the pick was cancelled')
-  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'the cancelled pick leaves no caret')
+  equal(document.querySelectorAll('.sh-vk-caret').length, 0, 'the cancelled pick leaves no caret either')
   equal(internals.state.cursor, null, 'and drops the stored position')
-  // The natural finish above did park the caret at the newest question.
-  equal(parked.key, 'u2', 'the finished reading had parked on the newest question')
-  assert(questionSegment, 'the newest question is readable')
-  equal(questionStart >= 0, true, 'the question start is in the stream')
-
-  // The resting marker is on the *newest* question, not on the older one nor on
-  // the reply the reading had reached.
-  equal(internals.resolveCursor().segment.key, 'u2', 'the resting anchor is the newest question')
-  const older = internals.readableFlow().find((entry) => entry.key === 'u1')
-  assert(older, 'there is an older question to confuse it with')
-  assert(internals.resolveCursor().segment.key !== 'u1', 'never the older question')
+  equal(internals.readingPlan().offset, questionStart, 'and the next reading also starts at the newest question')
   harness.dispose()
 })
 
@@ -1210,7 +1191,8 @@ await test('Escape disarms the picker', async () => {
 })
 
 await test('a stopped reading restarts at the newest question, not at the old pick', async () => {
-  const harness = createHarness({ tts: false })
+  // holdAudio keeps the clip playing, so the picked position is still stored.
+  const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const reply = document.getElementById('reply')
   const box = reply.getBoundingClientRect()
@@ -1219,7 +1201,8 @@ await test('a stopped reading restarts at the newest question, not at the old pi
   harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3 })
   await harness.settle()
   await harness.settle()
-  const picked = internals.state.cursor.offset
+  const picked = internals.state.cursor && internals.state.cursor.offset
+  assert(Number.isFinite(picked), `the pick had a stored offset (got ${picked})`)
   internals.stopReading()
   equal(internals.state.cursor, null, 'stopping drops the picked position')
   const button = document.querySelector('#mount-right button')

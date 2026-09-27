@@ -762,7 +762,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   harness.flushTimers(1000) // only the sub-second timers; the 5s idle one must stay pending
   includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
   includes(hint().textContent, 'After Pick → Tap', 'and its English caption')
-  equal(caret().style.display, 'none', 'no caret while the page click is awaited')
+  assert(!caret() || caret().style.display === 'none', 'no caret while the page click is awaited')
   equal(document.body.style.cursor, 'crosshair', 'the page invites a click')
 
   // Moving the pointer retires the bubble — the click that chooses the start
@@ -1095,6 +1095,40 @@ await test('stopping the reading by hand also rests the caret on the newest ques
   equal(caret().dataset.mode, 'quiet', 'resting, not blinking')
   equal(internals.state.cursor.key, 'u2', 'on the newest question')
   equal(internals.state.cursor.offset, 0, 'at its first character')
+  harness.dispose()
+})
+
+await test('only one caret node survives, and the resting one carries animation:none inline', async () => {
+  const harness = createHarness({ tts: false, holdAudio: true })
+  const { instance, document, internals } = harness
+  const button = document.querySelector('#mount-right button')
+  const carets = () => document.querySelectorAll('.sh-vk-caret')
+  const click = () => {
+    harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
+    harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
+  }
+
+  // A leftover caret from an older copy of the plugin (or a hot reload).
+  const stale = document.createElement('div')
+  stale.className = 'sh-vk-caret'
+  stale.dataset.mode = 'read'
+  stale.style.display = 'block'
+  stale.style.left = '11px'
+  document.body.append(stale)
+
+  click() // read: the plugin creates its own caret
+  await harness.settle()
+  await harness.settle()
+  equal(carets().length, 1, 'the stale caret was swept away')
+  assert(!document.body.contains(stale), 'and it is really gone from the page')
+  const live = carets()[0]
+  equal(live.style.animation, '', 'while reading the pulse comes from the stylesheet')
+
+  click() // stop: the marker comes to rest
+  equal(carets().length, 1, 'still exactly one caret')
+  equal(carets()[0].dataset.mode, 'quiet', 'it is the resting marker')
+  equal(carets()[0].style.animation, 'none', 'with the pulse switched off inline')
+  equal(internals.state.cursor.key, 'u2', 'parked on the newest question')
   harness.dispose()
 })
 

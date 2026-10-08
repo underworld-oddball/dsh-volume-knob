@@ -1,6 +1,6 @@
 {
   "name": "dsh-volume-knob",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Read the newest turn aloud from the DSH composer: a speaker button in the composer tool row, left of the model selector, that reads from the start of your newest question, scrolls the page to that spot and marks it with a blinking caret on one click, stops on the next, press-and-hold the icon to pick any other reading start position on the page, and opens a vertical volume mixer (in-page media volume + system output) on press-and-drag-up.",
   "license": "MIT",
   "author": "江湖老妖",

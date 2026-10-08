@@ -1,6 +1,6 @@
 {
-  "name": "sh-volume-shuff",
-  "version": "0.1.2",
+  "name": "dsh-volume-knob",
+  "version": "0.2.0",
   "description": "Read the newest turn aloud from the DSH composer: a speaker button in the composer tool row, left of the model selector, that reads from the start of your newest question, scrolls the page to that spot and marks it with a blinking caret on one click, stops on the next, press-and-hold the icon to pick any other reading start position on the page, and opens a vertical volume mixer (in-page media volume + system output) on press-and-drag-up.",
   "license": "MIT",
   "author": "江湖老妖",
@@ -52,10 +52,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/underworld-oddball/sh-volume-shuff.git"
+    "url": "git+https://github.com/underworld-oddball/dsh-volume-knob.git"
   },
-  "homepage": "https://github.com/underworld-oddball/sh-volume-shuff#readme",
+  "homepage": "https://github.com/underworld-oddball/dsh-volume-knob#readme",
   "bugs": {
-    "url": "https://github.com/underworld-oddball/sh-volume-shuff/issues"
+    "url": "https://github.com/underworld-oddball/dsh-volume-knob/issues"
   }
 }

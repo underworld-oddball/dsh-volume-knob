@@ -1,4 +1,4 @@
-# sh-volume-shuff
+# dsh-volume-knob
 
 > 朗读 + 音量，一个按钮。从**你最新那条提问的开头或者自选位置**开始朗读。· Read aloud from the start of your newest question — or from any spot you pick. One button.
 > 作者 / by **江湖老妖**
@@ -23,13 +23,13 @@ DeepSeek Harness Web GUI 的输入框工具行里、**模型选择框左边**的
 
 ```sh
 # 从 npm 安装（推荐）
-dsh plugin --profile web add sh-volume-shuff
+dsh plugin --profile web add dsh-volume-knob
 ```
 
 也可以直接从 GitHub 装（等价，取的是仓库源码）：
 
 ```sh
-dsh plugin --profile web add github:underworld-oddball/sh-volume-shuff
+dsh plugin --profile web add github:underworld-oddball/dsh-volume-knob
 ```
 
 收录进社区列表后，还能在 `dsh-market`（设置 → 插件市场）里搜到并一键安装。
@@ -117,7 +117,7 @@ dsh plugin --profile web add github:underworld-oddball/sh-volume-shuff
 ```
 package.json         dsh.bundle.patch + dsh.client.platform=web
 cordis.patch.yml     bundle 层
-lib/index.js         host 半：GET/POST /sh-volume-shuff/system、诊断 /sh-volume-shuff/diag
+lib/index.js         host 半：GET/POST /dsh-volume-knob/system、诊断 /dsh-volume-knob/diag
 lib/client.js        浏览器半：slot 按钮 + 文本/光标定位 + 朗读器 + 竖式混音台（无需构建步骤）
 scripts/test.mjs     jsdom 测试：把上面这个 bundle 原样跑在仿真会话 DOM 上
 ```

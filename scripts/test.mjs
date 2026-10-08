@@ -274,8 +274,8 @@ function createHarness (options = {}) {
       if (options.speakFailsFrom && text.includes(options.speakFailsFrom)) return json({ ok: false, error: { code: 'chain' } }, false, 502)
       return json({ ok: true, mime: 'audio/mpeg', audioBase64: Buffer.from(text).toString('base64') })
     }
-    if (path.startsWith('/sh-volume-shuff/system')) return json({ ok: true, supported: false, reason: 'test' })
-    if (path.startsWith('/sh-volume-shuff/diag')) return json({ ok: true })
+    if (path.startsWith('/dsh-volume-knob/system')) return json({ ok: true, supported: false, reason: 'test' })
+    if (path.startsWith('/dsh-volume-knob/diag')) return json({ ok: true })
     return json({ ok: false }, false, 404)
   }
 
@@ -339,7 +339,7 @@ function createHarness (options = {}) {
   // harness stubbed, exactly like a <script> tag on the real page does.
   runInContext(source, dom.getInternalVMContext())
   assert(window.__loaded, 'client bundle did not register itself with __ModuleLoader__')
-  equal(window.__loaded.id, 'sh-volume-shuff', 'bundle id')
+  equal(window.__loaded.id, 'dsh-volume-knob', 'bundle id')
   const require = (request) => {
     if (request === 'react') return runtime.React
     throw new Error(`unexpected require("${request}")`)
@@ -603,7 +603,7 @@ function createReactRuntime (window) {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-console.log('sh-volume-shuff — client bundle tests\n')
+console.log('dsh-volume-knob — client bundle tests\n')
 
 /**
  * One press-and-hold on the icon, as a browser delivers it: press, wait out the
@@ -622,7 +622,7 @@ const longPress = async (harness) => {
 await test('bundle registers the 0.1.7 slot contract', async () => {
   const harness = createHarness()
   equal(harness.window.__slotDefinition.name, 'conversation.input.right', 'slot name')
-  equal(harness.window.__slotDefinition.id, 'sh-volume-shuff', 'slot id')
+  equal(harness.window.__slotDefinition.id, 'dsh-volume-knob', 'slot id')
   equal(harness.window.__slotDefinition.order, 40, 'slot order')
   harness.dispose()
 })
@@ -684,7 +684,7 @@ await test('click reads from the start of the newest question and scrolls there'
   equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'no marker is left behind at the end')
   const plan = harness.internals.readingPlan()
   includes(plan.text, USER_TEXT, 'plan starts at the question')
-  assert(requests.some((entry) => entry.path === '/sh-volume-shuff/diag'), 'diagnostics were reported')
+  assert(requests.some((entry) => entry.path === '/dsh-volume-knob/diag'), 'diagnostics were reported')
 
   // Regression: the live DOM puts the token/time footer (kind="turn-tail")
   // *inside* the flow, and the first released version happily used it as the
@@ -787,7 +787,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   // newest question's first character.
   const stream = internals.messageIndex()
   const startEvents = harness.requests
-    .filter((entry) => entry.path === '/sh-volume-shuff/diag' && entry.body && entry.body.event === 'read:start')
+    .filter((entry) => entry.path === '/dsh-volume-knob/diag' && entry.body && entry.body.event === 'read:start')
   assert(startEvents.length > 0, 'the reading start was reported')
   const startedAt = JSON.parse(startEvents[startEvents.length - 1].body.detail).offset
   assert(startedAt > stream.text.indexOf(ASSISTANT_TEXT), `the pick read from inside the answer (got ${startedAt})`)
@@ -1220,7 +1220,7 @@ await test('a pick that keeps being moved but never clicked still times out and 
   equal(document.body.style.cursor, '', 'the pointer is back to normal')
   equal(internals.state.reading, false, 'nothing was read')
   // And the reason is on the record, so a live session can be audited.
-  const cancels = harness.requests.filter((entry) => entry.path === '/sh-volume-shuff/diag' && entry.body && entry.body.event === 'gesture:pick-cancel')
+  const cancels = harness.requests.filter((entry) => entry.path === '/dsh-volume-knob/diag' && entry.body && entry.body.event === 'gesture:pick-cancel')
   equal(cancels.length, 1, 'one cancellation was reported')
   equal(cancels[0].body.detail, 'idle-timeout', 'and it says why: the idle timeout')
   harness.dispose()
@@ -1604,7 +1604,7 @@ await test('the page volume slider drives in-page media and persists', async () 
   range.value = '42'
   harness.runtime.nativeDispatch(range, 'input')
   equal(Math.round(harness.internals.state.page * 100), 42, 'page volume updated')
-  const saved = JSON.parse(window.localStorage.getItem('sh-volume-shuff/state'))
+  const saved = JSON.parse(window.localStorage.getItem('dsh-volume-knob/state'))
   equal(Math.round(saved.page * 100), 42, 'page volume persisted')
   harness.dispose()
 })

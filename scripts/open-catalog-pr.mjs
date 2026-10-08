@@ -79,7 +79,7 @@ async function api (method, route, body) {
       authorization: `Bearer ${TOKEN}`,
       accept: 'application/vnd.github+json',
       'x-github-api-version': '2022-11-28',
-      'user-agent': 'sh-volume-shuff-catalog-pr',
+      'user-agent': 'dsh-volume-knob-catalog-pr',
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),

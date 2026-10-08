@@ -1,5 +1,5 @@
-url: https://github.com/underworld-oddball/sh-volume-shuff
-name: underworld-oddball/sh-volume-shuff
+url: https://github.com/underworld-oddball/dsh-volume-knob
+name: underworld-oddball/dsh-volume-knob
 category: voice
 description:
   en: Speaker button left of the model selector in the composer tool row — one click scrolls to the start of your newest question, marks it with a blinking caret and reads from there through the newest agent reply (dsh-tts, browser voice as fallback); press-and-hold the icon and then click anywhere on the page to pick another reading start position; press-and-drag-up opens a vertical mixer for in-page media volume and system output volume.

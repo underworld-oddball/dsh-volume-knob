@@ -681,7 +681,7 @@ await test('click reads from the start of the newest question and scrolls there'
   assert(!spokenText.includes('复制'), 'does not read action buttons')
     assert(layout.scrollCalls.length > 0, 'the page was scrolled to the start position')
   // However the voice timing falls, the reading ends with no marker left.
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'no marker is left behind at the end')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'no marker is left behind at the end')
   const plan = harness.internals.readingPlan()
   includes(plan.text, USER_TEXT, 'plan starts at the question')
   assert(requests.some((entry) => entry.path === '/dsh-volume-knob/diag'), 'diagnostics were reported')
@@ -706,7 +706,7 @@ await test('a press hides the hover bubble, the release reads, the next click st
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
-  const tip = () => document.querySelector('.sh-vs-tip')
+  const tip = () => document.querySelector('.dsh-vk-tip')
   const click = () => {
     harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
     harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
@@ -737,15 +737,15 @@ await test('holding the icon arms the picker and the page click picks the start 
   const button = () => document.querySelector('#mount-right button')
   const reply = document.getElementById('reply')
   const box = reply.getBoundingClientRect()
-  const caret = () => document.querySelector('.sh-vs-caret')
-  const hint = () => document.querySelector('.sh-vs-hint') || { style: {}, textContent: '' }
+  const caret = () => document.querySelector('.dsh-vk-caret')
+  const hint = () => document.querySelector('.dsh-vk-hint') || { style: {}, textContent: '' }
   // A fresh press does not arm anything: the hold threshold has to pass first.
   harness.runtime.dispatch(instance, button(), 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
   harness.runtime.dispatch(instance, button(), 'pointerenter', {}) // the pointer is on the icon
   equal(internals.state.picking, false, 'a fresh press does not arm the picker')
-  equal(document.querySelector('.sh-vs-hint'), null, 'and no pick bubble is up yet')
-  equal(document.querySelector('.sh-vs-tip').style.display, 'block', 'the hover bubble stays up while holding')
-  includes(document.querySelector('.sh-vs-tip').textContent, '长按选起点', 'and it still carries the idle wording')
+  equal(document.querySelector('.dsh-vk-hint'), null, 'and no pick bubble is up yet')
+  equal(document.querySelector('.dsh-vk-tip').style.display, 'block', 'the hover bubble stays up while holding')
+  includes(document.querySelector('.dsh-vk-tip').textContent, '长按选起点', 'and it still carries the idle wording')
   // Hold past the threshold, then release: the release is what changes the
   // bubble and arms the picker, and it must not turn into a read.
   await harness.sleep(450)
@@ -755,7 +755,7 @@ await test('holding the icon arms the picker and the page click picks the start 
   equal(internals.state.picking, true, 'the release after a hold arms the picker')
   equal(internals.state.pickStage, 'armed', 'stage = armed')
   equal(internals.state.reading, false, 'the release after a hold does not read')
-  equal(document.querySelector('.sh-vs-tip').style.display, 'none', 'and the hover bubble steps aside')
+  equal(document.querySelector('.dsh-vk-tip').style.display, 'none', 'and the hover bubble steps aside')
   equal(hint().style.display, 'block', 'the pick bubble takes its place')
   harness.flushTimers(1000) // only the sub-second timers; the 5s idle one must stay pending
   includes(hint().textContent, '选择开始位置后点击', 'the pick wording')
@@ -810,8 +810,8 @@ await test('the pick bubble replaces the hover bubble and is retired by the firs
   const harness = createHarness({ tts: false })
   const { instance, document, window, internals } = harness
   const button = () => document.querySelector('#mount-right button')
-  const tip = () => document.querySelector('.sh-vs-tip')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const tip = () => document.querySelector('.dsh-vk-tip')
+  const hint = () => document.querySelector('.dsh-vk-hint')
 
   // The pointer arrives on the icon: the idle bubble shows.
   harness.runtime.dispatch(instance, button(), 'pointerenter', {})
@@ -866,7 +866,7 @@ await test('moving the mouse only retires the bubble: the pick stays armed', asy
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const hint = () => document.querySelector('.dsh-vk-hint')
 
   // Arrive on the icon, then hold: the bubble replaces the hover one.
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
@@ -899,8 +899,8 @@ await test('a key press during the pick cancels it and retires the bubble', asyn
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
-  const tip = () => document.querySelector('.sh-vs-tip')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const tip = () => document.querySelector('.dsh-vk-tip')
+  const hint = () => document.querySelector('.dsh-vk-hint')
 
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
   harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
@@ -938,7 +938,7 @@ await test('a wheel turn, a drag, a context click or a blur all cancel the pick'
     const harness = createHarness({ tts: false })
     const { instance, document, window, internals } = harness
     const button = document.querySelector('#mount-right button')
-    const hint = () => document.querySelector('.sh-vs-hint')
+    const hint = () => document.querySelector('.dsh-vk-hint')
     harness.runtime.dispatch(instance, button, 'pointerenter', {})
     harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 100, clientY: 700, pointerId: 1, button: 0 })
     harness.runtime.dispatch(instance, button, 'pointermove', { clientX: 101, clientY: 700, pointerId: 1 })
@@ -957,8 +957,8 @@ await test('a wheel turn, a drag, a context click or a blur all cancel the pick'
 await test('the pick times out even when the mouse never moves after the release', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
-  const caret = () => document.querySelector('.sh-vs-caret')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const caret = () => document.querySelector('.dsh-vk-caret')
+  const hint = () => document.querySelector('.dsh-vk-hint')
 
   await longPress(harness)
   equal(internals.state.picking, true, 'the hold armed the picker')
@@ -971,7 +971,7 @@ await test('the pick times out even when the mouse never moves after the release
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'the idle pick cancels itself')
   equal(hint().style.display, 'none', 'the bubble is gone')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'no caret node is left behind')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'no caret node is left behind')
   equal(internals.state.cursor, null, 'and the stored position is dropped')
   equal(document.body.style.cursor, '', '光标回到初始状态')
   equal(internals.state.reading, false, 'and nothing was read')
@@ -981,8 +981,8 @@ await test('the pick times out even when the mouse never moves after the release
 await test('a pick that is left idle after the move times out and cancels itself', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
-  const caret = () => document.querySelector('.sh-vs-caret')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const caret = () => document.querySelector('.dsh-vk-caret')
+  const hint = () => document.querySelector('.dsh-vk-hint')
 
   // A caret is on screen when the pick starts, so "光标回到初始状态" is visible.
   internals.state.cursor = { key: 'a2resp', offset: 3 }
@@ -1006,7 +1006,7 @@ await test('a pick that is left idle after the move times out and cancels itself
   assert(harness.runTimer(idle[0]), 'and it fires')
   equal(internals.state.picking, false, 'the idle pick cancels itself')
   equal(internals.state.pickStage, 'idle', 'back to idle')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'the caret node is gone')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'the caret node is gone')
   equal(internals.state.cursor, null, 'and the stored position is dropped')
   equal(document.body.style.cursor, '', 'the pointer is back to normal')
   harness.dispose()
@@ -1045,10 +1045,10 @@ await test('finishing and cancelling both remove the caret', async () => {
   // what finishing does to the marker. The state is set synchronously.
   void internals.startReading()
   equal(internals.state.reading, true, 'reading')
-  assert(document.querySelector('.sh-vs-caret'), 'the caret is drawn while reading')
+  assert(document.querySelector('.dsh-vk-caret'), 'the caret is drawn while reading')
   internals.finishReading() // a reading that simply runs out
   equal(internals.state.reading, false, 'the reading finished')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'the finished reading leaves no marker')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'the finished reading leaves no marker')
   equal(internals.state.cursor, null, 'and drops the stored position')
   equal(internals.readingPlan().offset, questionStart, 'the next reading starts at the newest question')
 
@@ -1058,7 +1058,7 @@ await test('finishing and cancelling both remove the caret', async () => {
   equal(internals.state.picking, true, 'picker armed')
   harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
   equal(internals.state.picking, false, 'the pick was cancelled')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'the cancelled pick leaves no caret either')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'the cancelled pick leaves no caret either')
   equal(internals.state.cursor, null, 'and drops the stored position')
   equal(internals.readingPlan().offset, questionStart, 'and the next reading also starts at the newest question')
   harness.dispose()
@@ -1069,7 +1069,7 @@ await test('stopping the reading by hand takes the marker away entirely', async 
   const harness = createHarness({ tts: true, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
-  const caret = () => document.querySelector('.sh-vs-caret')
+  const caret = () => document.querySelector('.dsh-vk-caret')
   const click = () => {
     harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
     harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
@@ -1083,7 +1083,7 @@ await test('stopping the reading by hand takes the marker away entirely', async 
   equal(internals.state.reading, false, 'stopped')
   equal(document.body.style.cursor, '', 'the crosshair is gone')
   assert(!caret() || caret().style.display === 'none', 'the marker is gone from the page')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'and no caret node is left behind')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'and no caret node is left behind')
   equal(internals.state.cursor, null, 'the stored position is dropped')
   // The reading start is still the newest question's first character.
   const plan = internals.readingPlan()
@@ -1097,7 +1097,7 @@ await test('only one caret node ever exists, and a stop removes it', async () =>
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
-  const carets = () => document.querySelectorAll('.sh-vs-caret')
+  const carets = () => document.querySelectorAll('.dsh-vk-caret')
   const click = () => {
     harness.runtime.dispatch(instance, button, 'pointerdown', { clientX: 500, clientY: 700, pointerId: 1, button: 0 })
     harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 1 })
@@ -1105,7 +1105,7 @@ await test('only one caret node ever exists, and a stop removes it', async () =>
 
   // A leftover caret from an older copy of the plugin (or a hot reload).
   const stale = document.createElement('div')
-  stale.className = 'sh-vs-caret'
+  stale.className = 'dsh-vk-caret'
   stale.dataset.mode = 'read'
   stale.style.display = 'block'
   stale.style.left = '11px'
@@ -1132,21 +1132,21 @@ await test('a stacked pair is centred; the idle columns stay left aligned', asyn
 
   // Idle: three columns, left aligned as a grid.
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
-  const tip = document.querySelector('.sh-vs-tip')
+  const tip = document.querySelector('.dsh-vk-tip')
   internals.alignBubble(tip, 420) // a real layout would measure the grid this wide
   equal(tip.dataset.stack, 'row', 'the idle bubble is laid out as columns')
 
   // A pick prompt is a stacked pair: centred under one another.
   const hint = document.createElement('div')
-  hint.className = 'sh-vs-hint'
+  hint.className = 'dsh-vk-hint'
   document.body.append(hint)
   internals.alignBubble(hint, 120)
   equal(hint.dataset.stack, 'center', 'a narrow bubble is a stacked pair')
 
-  const css = document.getElementById('sh-vs-style').textContent
+  const css = document.getElementById('dsh-vk-style').textContent
   assert(!document.getElementById('sh-vk-style'), "the stylesheet keeps its own id, never the sibling sh-volume-knob's")
-  assert(!/sh-vk-/u.test(css), 'and no sh-vk- class can be shadowed by (or shadow) that sibling sheet')
-  includes(css, '.sh-vs-hint[data-stack="center"], .sh-vs-tip[data-stack="center"]', 'the stylesheet centres stacked pairs')
+  assert(!/(^|[^a-z])sh-vk-/u.test(css), 'and no bare sh-vk- class can be shadowed by (or shadow) that sibling sheet')
+  includes(css, '.dsh-vk-hint[data-stack="center"], .dsh-vk-tip[data-stack="center"]', 'the stylesheet centres stacked pairs')
   includes(css, 'text-align: center', 'with a real text-align rule')
   harness.dispose()
 })
@@ -1186,8 +1186,8 @@ await test('a click always starts at the newest question, even after the arrows 
 await test('a pick that keeps being moved but never clicked still times out and clears everything', async () => {
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
-  const caret = () => document.querySelector('.sh-vs-caret')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const caret = () => document.querySelector('.dsh-vk-caret')
+  const hint = () => document.querySelector('.dsh-vk-hint')
   const idleTimer = () => [...harness.pendingTimers.entries()].filter(([, entry]) => entry.ms === 5000)
 
   await longPress(harness)
@@ -1215,7 +1215,7 @@ await test('a pick that keeps being moved but never clicked still times out and 
   equal(internals.state.picking, false, 'the pick cancels itself')
   equal(internals.state.pickStage, 'idle', 'back to idle')
   equal(hint().style.display, 'none', 'the bubble is gone')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'no caret node is left')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'no caret node is left')
   equal(internals.state.cursor, null, 'and no stored position either')
   equal(document.body.style.cursor, '', 'the pointer is back to normal')
   equal(internals.state.reading, false, 'nothing was read')
@@ -1232,21 +1232,21 @@ await test('while the picker is live the page keeps the pick cursor, even on the
   const button = document.querySelector('#mount-right button')
   const root = document.documentElement
 
-  equal(root.classList.contains('sh-vs-picking'), false, 'no pick cursor class before the gesture')
+  equal(root.classList.contains('dsh-vk-picking'), false, 'no pick cursor class before the gesture')
 
   await longPress(harness)
   equal(internals.state.picking, true, 'picker armed')
-  equal(root.classList.contains('sh-vs-picking'), true, 'the page switches to the pick cursor')
+  equal(root.classList.contains('dsh-vk-picking'), true, 'the page switches to the pick cursor')
   equal(document.body.style.cursor, 'crosshair', 'and the body cursor follows')
-  const css = document.getElementById('sh-vs-style').textContent
-  includes(css, 'html.sh-vs-picking', 'the stylesheet targets the root class')
+  const css = document.getElementById('dsh-vk-style').textContent
+  includes(css, 'html.dsh-vk-picking', 'the stylesheet targets the root class')
   includes(css, 'cursor: crosshair !important', 'and outranks the icon inline cursor: pointer')
-  assert(css.includes('html.sh-vs-picking *'), 'the override covers every element on the page')
+  assert(css.includes('html.dsh-vk-picking *'), 'the override covers every element on the page')
   equal(button.style.cursor, 'pointer', 'the icon still declares its own hand cursor (overridden while picking)')
 
   // Moving around mid-pick must not end it or change the shape.
   harness.runtime.dispatch(instance, document, 'pointermove', { clientX: 320, clientY: 480 })
-  equal(root.classList.contains('sh-vs-picking'), true, 'still the pick cursor after a move')
+  equal(root.classList.contains('dsh-vk-picking'), true, 'still the pick cursor after a move')
 
   // Picking a spot ends the session and restores the normal cursor.
   const reply = document.getElementById('reply')
@@ -1255,15 +1255,15 @@ await test('while the picker is live the page keeps the pick cursor, even on the
   harness.runtime.dispatch(instance, document, 'pointerup', { clientX: box.left + 30, clientY: box.top + 8, pointerId: 3 })
   await harness.settle()
   equal(internals.state.picking, false, 'the pick committed')
-  equal(root.classList.contains('sh-vs-picking'), false, 'and the pick cursor is gone')
+  equal(root.classList.contains('dsh-vk-picking'), false, 'and the pick cursor is gone')
   equal(document.body.style.cursor, '', 'the body cursor is restored')
 
   // A cancelled pick restores it too.
   await longPress(harness)
-  equal(root.classList.contains('sh-vs-picking'), true, 'armed again')
+  equal(root.classList.contains('dsh-vk-picking'), true, 'armed again')
   harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
   equal(internals.state.picking, false, 'cancelled')
-  equal(root.classList.contains('sh-vs-picking'), false, 'and restored')
+  equal(root.classList.contains('dsh-vk-picking'), false, 'and restored')
   harness.dispose()
 })
 
@@ -1305,8 +1305,8 @@ await test('a click on empty space cancels the pick and removes the caret', asyn
   const harness = createHarness({ tts: false, holdAudio: true })
   const { instance, document, internals } = harness
   const button = document.querySelector('#mount-right button')
-  const caret = () => document.querySelector('.sh-vs-caret')
-  const hint = () => document.querySelector('.sh-vs-hint')
+  const caret = () => document.querySelector('.dsh-vk-caret')
+  const hint = () => document.querySelector('.dsh-vk-hint')
 
   // A reading is on, so a caret is blinking when the pick starts.
   internals.state.cursor = { key: 'a2resp', offset: 3 }
@@ -1323,7 +1323,7 @@ await test('a click on empty space cancels the pick and removes the caret', asyn
   equal(internals.state.picking, false, 'a click on empty space cancels the pick')
   equal(internals.state.pickStage, 'idle', 'back to idle')
   equal(hint().style.display, 'none', 'the pick bubble is down')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'and the caret node is gone')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'and the caret node is gone')
   equal(internals.state.cursor, null, 'with the stored position dropped')
   equal(document.body.style.cursor, '', 'the pointer is restored')
   equal(internals.state.reading, false, 'nothing is read')
@@ -1337,7 +1337,7 @@ await test('Escape disarms the picker', async () => {
   equal(internals.state.picking, true, 'armed')
   harness.runtime.dispatch(instance, document, 'keydown', { key: 'Escape' })
   equal(internals.state.picking, false, 'Escape disarms')
-  equal(document.querySelector('.sh-vs-hint').style.display, 'none', 'and hides the hint')
+  equal(document.querySelector('.dsh-vk-hint').style.display, 'none', 'and hides the hint')
   harness.dispose()
 })
 
@@ -1378,7 +1378,7 @@ await test('a stray drag neither picks nor opens the mixer (it reads instead)', 
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 760, pointerId: 1 })
   equal(internals.state.picking, false, 'no picker')
   equal(internals.state.pickStage, 'idle', 'no pick stage')
-  equal(document.querySelectorAll('.sh-vs-hint').length, 0, 'no hint')
+  equal(document.querySelectorAll('.dsh-vk-hint').length, 0, 'no hint')
   equal(internals.state.reading, true, 'a short press is a plain click, so it reads')
   harness.dispose()
 })
@@ -1470,23 +1470,23 @@ await test('the icon hover bubble shows both languages in the hint styling, not 
   includes(button.getAttribute('aria-label'), '点击朗读；长按选起点；上滑调音量', 'accessible label carries the wording')
 
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
-  const tip = document.querySelector('.sh-vs-tip')
+  const tip = document.querySelector('.dsh-vk-tip')
   assert(tip, 'the hover bubble exists')
   equal(tip.style.display, 'block', 'and is visible on hover')
   // Three gesture columns, each with its Chinese label above the English caption.
-  const columns = tip.querySelectorAll('.sh-vs-opt')
+  const columns = tip.querySelectorAll('.dsh-vk-opt')
   equal(columns.length, 3, 'three gesture columns')
-  const cn = [...tip.querySelectorAll('.sh-vs-cn')].map((node) => node.textContent)
-  const en = [...tip.querySelectorAll('.sh-vs-en')].map((node) => node.textContent)
+  const cn = [...tip.querySelectorAll('.dsh-vk-cn')].map((node) => node.textContent)
+  const en = [...tip.querySelectorAll('.dsh-vk-en')].map((node) => node.textContent)
   equal(cn.join(' | '), '点击朗读 | 长按选起点 | 上滑调音量', 'Chinese labels, left to right')
   equal(en.join(' | '), '[Tap: Speak] | [Hold: Pick] | [Swipe ↑: Volume]', 'English captions under their own column')
-  equal(columns[0].querySelector('.sh-vs-en').textContent, '[Tap: Speak]', 'column 1 pairs Tap with 点击朗读')
-  equal(columns[2].querySelector('.sh-vs-cn').textContent, '上滑调音量', 'column 3 is the volume gesture')
-  const css = document.getElementById('sh-vs-style').textContent
-  includes(css, '.sh-vs-hint, .sh-vs-tip', 'the bubble shares the hint stylesheet')
+  equal(columns[0].querySelector('.dsh-vk-en').textContent, '[Tap: Speak]', 'column 1 pairs Tap with 点击朗读')
+  equal(columns[2].querySelector('.dsh-vk-cn').textContent, '上滑调音量', 'column 3 is the volume gesture')
+  const css = document.getElementById('dsh-vk-style').textContent
+  includes(css, '.dsh-vk-hint, .dsh-vk-tip', 'the bubble shares the hint stylesheet')
   includes(css, 'color: #c2410c', 'and the hint colour')
   includes(css, 'color: #9ca3af', 'the English caption is grey')
-  includes(css, '.sh-vs-grid', 'the idle bubble is laid out as a grid')
+  includes(css, '.dsh-vk-grid', 'the idle bubble is laid out as a grid')
   includes(css, 'flex-direction: column', 'each column stacks its own two lines')
   includes(css, 'white-space: nowrap', 'and nothing wraps into its neighbour')
   harness.runtime.dispatch(instance, button, 'pointerleave', {})
@@ -1495,7 +1495,7 @@ await test('the icon hover bubble shows both languages in the hint styling, not 
   // "点击停止" is the same bubble while reading
   internals.state.reading = true
   harness.runtime.dispatch(instance, button, 'pointerenter', {})
-  equal(document.querySelector('.sh-vs-tip').textContent, '点击停止Tap: Stop', 'the same bubble shows the stop wording, bilingual')
+  equal(document.querySelector('.dsh-vk-tip').textContent, '点击停止Tap: Stop', 'the same bubble shows the stop wording, bilingual')
   harness.dispose()
 })
 
@@ -1504,13 +1504,13 @@ await test('the caret is a gradient bar with a breathing pulse and two colour mo
   const { internals, document } = harness
   const stream = internals.messageIndex()
   internals.focusStartPosition({ stream, offset: stream.text.indexOf(USER_TEXT) })
-  const style = document.getElementById('sh-vs-style')
+  const style = document.getElementById('dsh-vk-style')
   assert(style, 'the caret stylesheet is installed')
   const css = style.textContent
   includes(css, 'linear-gradient', 'the caret uses a gradient')
   includes(css, 'data-mode="pick"', 'the picker has its own colour mode')
-  includes(css, 'sh-vs-breathe', 'and a soft pulse keyframe instead of a hard blink')
-  const caret = document.querySelector('.sh-vs-caret')
+  includes(css, 'dsh-vk-breathe', 'and a soft pulse keyframe instead of a hard blink')
+  const caret = document.querySelector('.dsh-vk-caret')
   equal(caret.dataset.mode, 'read', 'reading mode by default')
   equal(caret.style.display, 'block', 'and it is on screen')
   harness.dispose()
@@ -1522,7 +1522,7 @@ await test('a second icon click stops the reading and removes the caret', async 
   const button = document.querySelector('#mount-right button')
   const reply = document.getElementById('reply')
   const box = reply.getBoundingClientRect()
-  const caret = () => document.querySelector('.sh-vs-caret')
+  const caret = () => document.querySelector('.dsh-vk-caret')
 
   // pick a start position with a hold + page click, which reads and leaves the
   // caret on screen
@@ -1539,7 +1539,7 @@ await test('a second icon click stops the reading and removes the caret', async 
   harness.runtime.dispatch(instance, button, 'pointerup', { clientX: 500, clientY: 700, pointerId: 4 })
   equal(internals.state.reading, false, 'the second click stopped the reading')
   assert(!caret() || caret().style.display === 'none', 'the marker is gone')
-  equal(document.querySelectorAll('.sh-vs-caret').length, 0, 'no caret node remains')
+  equal(document.querySelectorAll('.dsh-vk-caret').length, 0, 'no caret node remains')
   equal(internals.state.cursor, null, 'the stored position is dropped')
   equal(document.body.style.cursor, '', 'the cursor is restored')
   harness.dispose()
@@ -1552,7 +1552,7 @@ await test('the caret is re-measured as the page scrolls', async () => {
   const at = stream.text.indexOf(ASSISTANT_TEXT) + 3
   internals.state.cursor = { key: 'a2resp', offset: 3 }
   internals.focusStartPosition({ stream, offset: at })
-  const caret = document.querySelector('.sh-vs-caret')
+  const caret = document.querySelector('.dsh-vk-caret')
   const first = { left: caret.style.left, top: caret.style.top }
   assert(first.top, 'the caret was placed')
   window.dispatchEvent(new window.Event('scroll'))

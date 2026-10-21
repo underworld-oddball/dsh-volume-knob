@@ -10,6 +10,11 @@
 > `jianghu-lao-yao/sh-volume-knob` 一起撤掉了——从此列表里只有一个「朗读 + 音量」条目。
 > 下文 §8 是改名前的实战记录，里面写成 `dsh-volume-knob 0.1.x` 的地方，当时实际是 `sh-volume-shuff`。
 
+> **0.3.0（2026-10-21）**
+> 调 `/dsh-tts/speak` 时补上 `channel: 'web'`。dsh-tts 把不带该字段的请求当成 messenger 调用，
+> 会按 `messengerTtsEnabled` 挡成 403；它自己的 Web 客户端一直发的就是这个字段。
+> 改后朗读不再依赖「群组语音回复」那个给 Telegram/Discord 网关用的开关。
+
 ---
 
 ## 1. 建仓库并推送

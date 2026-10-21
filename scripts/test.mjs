@@ -1405,6 +1405,7 @@ await test('dsh-tts speaks chunk by chunk from the chosen offset', async () => {
   assert(calls.length > 0, 'the speak route was called')
   assert(calls.length >= 1, 'each chunk is synthesized separately')
   includes(calls[0].body.text, ASSISTANT_TEXT.slice(10, 20), 'first chunk starts at the chosen offset')
+  equal(calls[0].body.channel, 'web', 'declares the web channel, so dsh-tts never gates it as a messenger call')
   assert(harness.audioQueue.length > 0, 'audio was played')
   harness.dispose()
 })
